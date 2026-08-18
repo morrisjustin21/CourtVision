@@ -9,6 +9,8 @@ const STAT_FIELDS = [
   { key: 'three_att', label: '3PA' },
   { key: 'ft_made', label: 'FTM' },
   { key: 'ft_att', label: 'FTA' },
+  { key: 'oreb', label: 'OREB' },
+  { key: 'dreb', label: 'DREB' },
   { key: 'rebounds', label: 'REB' },
   { key: 'assists', label: 'AST' },
   { key: 'steals', label: 'STL' },
@@ -29,6 +31,8 @@ const HUDL_COLUMN_MAP = {
   ThreePointAttempts: 'three_att',
   FreeThrowsMade: 'ft_made',
   FreeThrowAttempts: 'ft_att',
+  OffensiveRebounds: 'oreb',
+  DefensiveRebounds: 'dreb',
   Rebounds: 'rebounds',
   Assists: 'assists',
   Steals: 'steals',
@@ -122,6 +126,8 @@ function parseReportCsv(text) {
   const threeAttIdx = col('3FGA')
   const ftMadeIdx = col('FTM')
   const ftAttIdx = col('FTA')
+  const orebIdx = col('OREB')
+  const drebIdx = col('DREB')
   const rebIdx = col('REB')
   const astIdx = col('AST')
   const toIdx = col('TO')
@@ -154,6 +160,8 @@ function parseReportCsv(text) {
         three_att: num(fields[threeAttIdx]),
         ft_made: num(fields[ftMadeIdx]),
         ft_att: num(fields[ftAttIdx]),
+        oreb: num(fields[orebIdx]),
+        dreb: num(fields[drebIdx]),
         rebounds: num(fields[rebIdx]),
         assists: num(fields[astIdx]),
         turnovers: num(fields[toIdx]),
