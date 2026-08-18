@@ -49,6 +49,114 @@ function parseHudlBoxScore(text) {
   }).filter((row) => !Number.isNaN(row.jersey))
 }
 
+// Parses a single CSV line, respecting double-quoted fields that may
+// themselves contain commas (e.g. "Tavon Washington , LHSOK").
+function parseCsvLine(line) {
+  const result = []
+  let cur = ''
+  let inQuotes = false
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i]
+    if (inQuotes) {
+      if (ch === '"') {
+        if (line[i + 1] === '"') {
+          cur += '"'
+          i++
+        } else {
+          inQuotes = false
+        }
+      } else {
+        cur += ch
+      }
+    } else if (ch === '"') {
+      inQuotes = true
+    } else if (ch === ',') {
+      result.push(cur)
+      cur = ''
+    } else {
+      cur += ch
+    }
+  }
+  result.push(cur)
+  return result.map((s) => s.trim())
+}
+
+// Some stat-report CSV exports (e.g. "All Athletes — Averages" reports)
+// include a title line, then a wide header row with several duplicate/blank
+// spacer columns. Player names are included, formatted "Name , TeamAbbrev".
+// Oddly, the points-scored column in these reports is labeled "PF" rather
+// than personal fouls — personal fouls live in a separate "FOUL" column.
+function parseReportCsv(text) {
+  const lines = text.split(/\r?\n/).filter((l) => l.trim() !== '')
+  let header = null
+  let headerIdx = -1
+  for (let i = 0; i < Math.min(lines.length, 5); i++) {
+    const fields = parseCsvLine(lines[i])
+    if (fields.includes('Athletes') && fields.includes('#')) {
+      header = fields
+      headerIdx = i
+      break
+    }
+  }
+  if (!header) return []
+
+  const col = (name) => header.indexOf(name)
+  const jerseyIdx = col('#')
+  const athleteIdx = col('Athletes')
+  const pointsIdx = col('PF')
+  const rebIdx = col('REB')
+  const astIdx = col('AST')
+  const toIdx = col('TO')
+  const stlIdx = col('STL')
+  const blkIdx = col('BLK')
+  const foulIdx = col('FOUL')
+  const minsIdx = col('MINS')
+
+  function num(v) {
+    const n = parseInt(String(v ?? '').replace('%', '').trim(), 10)
+    return Number.isNaN(n) ? 0 : n
+  }
+
+  const rows = []
+  for (let i = headerIdx + 1; i < lines.length; i++) {
+    const fields = parseCsvLine(lines[i])
+    if (fields.length < header.length) continue
+    const jersey = parseInt(fields[jerseyIdx], 10)
+    if (Number.isNaN(jersey)) continue
+    const namePart = (fields[athleteIdx] || '').split(',')[0].trim()
+    const suggestedName = namePart && namePart.toLowerCase() !== 'unknown' ? namePart : null
+    rows.push({
+      jersey,
+      suggestedName,
+      stats: {
+        points: num(fields[pointsIdx]),
+        rebounds: num(fields[rebIdx]),
+        assists: num(fields[astIdx]),
+        turnovers: num(fields[toIdx]),
+        steals: num(fields[stlIdx]),
+        blocks: num(fields[blkIdx]),
+        fouls: num(fields[foulIdx]),
+        minutes: num(fields[minsIdx]),
+      },
+    })
+  }
+  return rows
+}
+
+// Auto-detects which box score format a file is in and parses it accordingly.
+function parseBoxScoreFile(text) {
+  const lines = text.trim().split(/\r?\n/)
+  if (lines[1] && lines[1].split('|').includes('Jersey')) {
+    return { format: 'hudl', rows: parseHudlBoxScore(text) }
+  }
+  for (let i = 0; i < Math.min(lines.length, 5); i++) {
+    if (parseCsvLine(lines[i]).includes('Athletes')) {
+      return { format: 'csv', rows: parseReportCsv(text) }
+    }
+  }
+  return { format: 'unknown', rows: [] }
+}
+
 // Basketball seasons usually span two calendar years (e.g. a game in
 // Nov 2025 and a game in Feb 2026 are both part of the "2025-26" season).
 // This guesses a sensible default; the season field is always editable.
@@ -393,11 +501,19 @@ function GameDetail({ game: initialGame, onBack }) {
   const [unmatched, setUnmatched] = useState({ home: [], away: [] })
   const [newNames, setNewNames] = useState({})
   const [importing, setImporting] = useState({})
+  const [importError, setImportError] = useState({})
 
   async function handleImportFile(file, side, roster, teamId) {
     setImporting((p) => ({ ...p, [side]: true }))
+    setImportError((p) => ({ ...p, [side]: null }))
     const text = await file.text()
-    const rows = parseHudlBoxScore(text)
+    const { format, rows } = parseBoxScoreFile(text)
+
+    if (format === 'unknown') {
+      setImportError((p) => ({ ...p, [side]: "Couldn't recognize this file's format." }))
+      setImporting((p) => ({ ...p, [side]: false }))
+      return
+    }
 
     const stillUnmatched = []
     for (const row of rows) {
@@ -409,6 +525,13 @@ function GameDetail({ game: initialGame, onBack }) {
       }
     }
     setUnmatched((p) => ({ ...p, [side]: stillUnmatched }))
+    setNewNames((prev) => {
+      const next = { ...prev }
+      stillUnmatched.forEach((row) => {
+        if (row.suggestedName) next[`${side}-${row.jersey}`] = row.suggestedName
+      })
+      return next
+    })
     setImporting((p) => ({ ...p, [side]: false }))
   }
 
@@ -491,6 +614,7 @@ function GameDetail({ game: initialGame, onBack }) {
             setNewNames={setNewNames}
             handleImportFile={handleImportFile}
             addUnmatchedPlayer={addUnmatchedPlayer}
+            importError={importError}
           />
           <RosterTable
             roster={homeRoster}
@@ -508,6 +632,7 @@ function GameDetail({ game: initialGame, onBack }) {
             setNewNames={setNewNames}
             handleImportFile={handleImportFile}
             addUnmatchedPlayer={addUnmatchedPlayer}
+            importError={importError}
           />
         </>
       )}
@@ -531,9 +656,11 @@ function RosterTable({
   setNewNames,
   handleImportFile,
   addUnmatchedPlayer,
+  importError,
 }) {
-  const fileInputId = `hudl-import-${side}`
+  const fileInputId = `box-score-import-${side}`
   const unmatchedRows = unmatched[side] || []
+  const error = importError?.[side]
 
   return (
     <div className="mb-8">
@@ -545,12 +672,12 @@ function RosterTable({
           htmlFor={fileInputId}
           className="text-xs bg-panel2 border border-line hover:border-red text-chalk rounded-md px-3 py-1.5 cursor-pointer"
         >
-          {importing[side] ? 'Importing…' : 'Import Hudl file'}
+          {importing[side] ? 'Importing…' : 'Import box score file'}
         </label>
         <input
           id={fileInputId}
           type="file"
-          accept=".txt,.csv,text/plain"
+          accept=".txt,.csv,text/plain,text/csv"
           className="hidden"
           onChange={(e) => {
             const file = e.target.files?.[0]
@@ -560,10 +687,14 @@ function RosterTable({
         />
       </div>
 
+      {error && (
+        <p className="text-alert text-xs mb-3">{error}</p>
+      )}
+
       {unmatchedRows.length > 0 && (
         <div className="bg-panel2 border border-red/40 rounded-lg p-4 mb-3 space-y-2">
           <p className="text-xs text-chalkdim">
-            These jersey numbers from the file don't match anyone on this roster yet. Name them to add the player and save their stats:
+            These jersey numbers from the file don't match anyone on this roster yet. Confirm or edit the name, then add the player and save their stats:
           </p>
           {unmatchedRows.map((row) => (
             <div key={row.jersey} className="flex items-center gap-2">
