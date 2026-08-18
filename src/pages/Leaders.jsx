@@ -79,7 +79,7 @@ export default function Leaders() {
               key={s.key}
               onClick={() => setSortKey(s.key)}
               className={`text-xs font-medium px-3 py-1.5 rounded ${
-                sortKey === s.key ? 'bg-amber text-court' : 'text-chalkdim hover:text-chalk'
+                sortKey === s.key ? 'bg-red text-white' : 'text-chalkdim hover:text-chalk'
               }`}
             >
               {s.label}
@@ -121,7 +121,7 @@ export default function Leaders() {
                   <td className="px-4 py-3 text-chalkdim">
                     <span
                       className="inline-block w-2 h-2 rounded-full mr-1.5"
-                      style={{ backgroundColor: p.teamColor || '#E8871E' }}
+                      style={{ backgroundColor: p.teamColor || '#E31B23' }}
                     />
                     {p.team}
                   </td>
@@ -130,7 +130,7 @@ export default function Leaders() {
                     <td
                       key={s.key}
                       className={`px-3 py-3 text-center stat-figure ${
-                        sortKey === s.key ? 'text-amber font-semibold' : ''
+                        sortKey === s.key ? 'text-red font-semibold' : ''
                       }`}
                     >
                       {p[s.key].toFixed(1)}

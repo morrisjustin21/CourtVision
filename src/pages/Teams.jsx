@@ -36,7 +36,7 @@ export default function Teams() {
         <h1 className="font-display text-4xl font-bold">Teams</h1>
         <button
           onClick={() => setShowNewTeam(true)}
-          className="bg-amber text-court font-semibold text-sm rounded-md px-4 py-2 hover:bg-amber/90"
+          className="bg-red text-white font-semibold text-sm rounded-md px-4 py-2 hover:bg-red/90"
         >
           + Add team
         </button>
@@ -64,20 +64,20 @@ export default function Teams() {
             <button
               key={t.id}
               onClick={() => setSelectedTeam(t)}
-              className="text-left bg-panel border border-line rounded-lg p-5 hover:border-amber transition group"
+              className="text-left bg-panel border border-line rounded-lg p-5 hover:border-red transition group"
             >
               <div className="flex items-center justify-between mb-3">
                 <span
                   className="w-3 h-3 rounded-full"
-                  style={{ backgroundColor: t.color || '#E8871E' }}
+                  style={{ backgroundColor: t.color || '#E31B23' }}
                 />
                 {t.is_my_team && (
-                  <span className="text-[10px] uppercase tracking-wide text-amber border border-amber/40 rounded-full px-2 py-0.5">
+                  <span className="text-[10px] uppercase tracking-wide text-red border border-red/40 rounded-full px-2 py-0.5">
                     My team
                   </span>
                 )}
               </div>
-              <h3 className="font-display text-2xl font-semibold group-hover:text-amber transition">
+              <h3 className="font-display text-2xl font-semibold group-hover:text-red transition">
                 {t.name}
               </h3>
               <p className="text-chalkdim text-sm mt-1">
@@ -122,7 +122,7 @@ function NewTeamForm({ onCancel, onCreated }) {
           required
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="w-full bg-panel2 border border-line rounded-md px-3 py-2 focus:border-amber outline-none"
+          className="w-full bg-panel2 border border-line rounded-md px-3 py-2 focus:border-red outline-none"
           placeholder="Thunder"
         />
       </div>
@@ -131,7 +131,7 @@ function NewTeamForm({ onCancel, onCreated }) {
         <input
           value={league}
           onChange={(e) => setLeague(e.target.value)}
-          className="w-full bg-panel2 border border-line rounded-md px-3 py-2 focus:border-amber outline-none"
+          className="w-full bg-panel2 border border-line rounded-md px-3 py-2 focus:border-red outline-none"
           placeholder="Rec league, AAU, etc."
         />
       </div>
@@ -140,7 +140,7 @@ function NewTeamForm({ onCancel, onCreated }) {
         <input
           value={division}
           onChange={(e) => setDivision(e.target.value)}
-          className="w-full bg-panel2 border border-line rounded-md px-3 py-2 focus:border-amber outline-none"
+          className="w-full bg-panel2 border border-line rounded-md px-3 py-2 focus:border-red outline-none"
         />
       </div>
       <label className="flex items-center gap-2 text-sm text-chalkdim sm:col-span-2">
@@ -154,7 +154,7 @@ function NewTeamForm({ onCancel, onCreated }) {
         <button
           type="submit"
           disabled={saving}
-          className="bg-amber text-court font-semibold text-sm rounded-md px-4 py-2 hover:bg-amber/90 disabled:opacity-60"
+          className="bg-red text-white font-semibold text-sm rounded-md px-4 py-2 hover:bg-red/90 disabled:opacity-60"
         >
           {saving ? 'Saving…' : 'Save team'}
         </button>
@@ -220,7 +220,7 @@ function TeamDetail({ team, onBack }) {
         </div>
         <button
           onClick={() => setShowNewPlayer(true)}
-          className="bg-amber text-court font-semibold text-sm rounded-md px-4 py-2 hover:bg-amber/90"
+          className="bg-red text-white font-semibold text-sm rounded-md px-4 py-2 hover:bg-red/90"
         >
           + Add player
         </button>
@@ -237,7 +237,7 @@ function TeamDetail({ team, onBack }) {
               required
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full bg-panel2 border border-line rounded-md px-3 py-2 focus:border-amber outline-none"
+              className="w-full bg-panel2 border border-line rounded-md px-3 py-2 focus:border-red outline-none"
             />
           </div>
           <div>
@@ -246,7 +246,7 @@ function TeamDetail({ team, onBack }) {
               type="number"
               value={jersey}
               onChange={(e) => setJersey(e.target.value)}
-              className="w-full bg-panel2 border border-line rounded-md px-3 py-2 focus:border-amber outline-none"
+              className="w-full bg-panel2 border border-line rounded-md px-3 py-2 focus:border-red outline-none"
             />
           </div>
           <div>
@@ -255,7 +255,7 @@ function TeamDetail({ team, onBack }) {
               value={position}
               onChange={(e) => setPosition(e.target.value)}
               placeholder="G / F / C"
-              className="w-full bg-panel2 border border-line rounded-md px-3 py-2 focus:border-amber outline-none"
+              className="w-full bg-panel2 border border-line rounded-md px-3 py-2 focus:border-red outline-none"
             />
           </div>
           <div className="sm:col-span-4 flex justify-end gap-2">
@@ -268,7 +268,7 @@ function TeamDetail({ team, onBack }) {
             </button>
             <button
               type="submit"
-              className="bg-amber text-court font-semibold text-sm rounded-md px-4 py-2 hover:bg-amber/90"
+              className="bg-red text-white font-semibold text-sm rounded-md px-4 py-2 hover:bg-red/90"
             >
               Save player
             </button>

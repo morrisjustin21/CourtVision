@@ -1,4 +1,4 @@
--- Hoops Tracker database schema
+-- CourtVision database schema
 -- Run this in Supabase: Project > SQL Editor > New Query > paste all > Run
 
 create extension if not exists "pgcrypto";
@@ -8,7 +8,7 @@ create table if not exists teams (
   name text not null,
   league text,
   division text,
-  color text default '#E8871E',
+  color text default '#E31B23',
   is_my_team boolean default false,
   created_at timestamptz default now()
 );

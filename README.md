@@ -1,4 +1,4 @@
-# Hoops Tracker
+# CourtVision
 
 A private, multi-device basketball tracker: teams, rosters, game-by-game box scores,
 and league-wide stat leaders. Built with React + Vite, styled with Tailwind, and backed
@@ -46,7 +46,7 @@ Then create a new repository on github.com (keep it **private**), and follow the
 "push an existing repository" instructions it shows you — something like:
 
 ```bash
-git remote add origin https://github.com/YOUR_USERNAME/hoops-tracker.git
+git remote add origin https://github.com/YOUR_USERNAME/courtvision.git
 git branch -M main
 git push -u origin main
 ```
@@ -55,7 +55,7 @@ Note: `.env` is in `.gitignore` and will **not** be pushed to GitHub — that's 
 
 ## 5. Deploy on Vercel
 
-1. Go to vercel.com → **Add New → Project** → import your `hoops-tracker` GitHub repo.
+1. Go to vercel.com → **Add New → Project** → import your `courtvision` GitHub repo.
 2. Vercel will auto-detect it as a Vite project. Before deploying, open **Environment Variables** and add:
    - `VITE_SUPABASE_URL` → your Supabase project URL
    - `VITE_SUPABASE_ANON_KEY` → your Supabase anon/publishable key

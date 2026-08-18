@@ -92,7 +92,7 @@ export default function Games() {
         <h1 className="font-display text-4xl font-bold">Games</h1>
         <button
           onClick={() => setShowNewGame(true)}
-          className="bg-amber text-court font-semibold text-sm rounded-md px-4 py-2 hover:bg-amber/90"
+          className="bg-red text-white font-semibold text-sm rounded-md px-4 py-2 hover:bg-red/90"
           disabled={teams.length < 2}
           title={teams.length < 2 ? 'Add at least 2 teams first' : ''}
         >
@@ -127,7 +127,7 @@ export default function Games() {
             <button
               key={g.id}
               onClick={() => setSelectedGame(g)}
-              className="w-full text-left bg-panel border border-line rounded-lg px-5 py-4 hover:border-amber transition flex items-center justify-between"
+              className="w-full text-left bg-panel border border-line rounded-lg px-5 py-4 hover:border-red transition flex items-center justify-between"
             >
               <div className="flex items-center gap-4">
                 <span className="text-xs text-chalkdim w-24 shrink-0">{g.game_date}</span>
@@ -190,7 +190,7 @@ function NewGameForm({ teams, onCancel, onCreated }) {
           required
           value={date}
           onChange={(e) => setDate(e.target.value)}
-          className="w-full bg-panel2 border border-line rounded-md px-3 py-2 focus:border-amber outline-none"
+          className="w-full bg-panel2 border border-line rounded-md px-3 py-2 focus:border-red outline-none"
         />
       </div>
       <div />
@@ -200,7 +200,7 @@ function NewGameForm({ teams, onCancel, onCreated }) {
           required
           value={awayTeamId}
           onChange={(e) => setAwayTeamId(e.target.value)}
-          className="w-full bg-panel2 border border-line rounded-md px-3 py-2 focus:border-amber outline-none"
+          className="w-full bg-panel2 border border-line rounded-md px-3 py-2 focus:border-red outline-none"
         >
           <option value="">Select team</option>
           {teams.map((t) => (
@@ -214,7 +214,7 @@ function NewGameForm({ teams, onCancel, onCreated }) {
           required
           value={homeTeamId}
           onChange={(e) => setHomeTeamId(e.target.value)}
-          className="w-full bg-panel2 border border-line rounded-md px-3 py-2 focus:border-amber outline-none"
+          className="w-full bg-panel2 border border-line rounded-md px-3 py-2 focus:border-red outline-none"
         >
           <option value="">Select team</option>
           {teams.map((t) => (
@@ -228,7 +228,7 @@ function NewGameForm({ teams, onCancel, onCreated }) {
           type="number"
           value={awayScore}
           onChange={(e) => setAwayScore(e.target.value)}
-          className="w-full bg-panel2 border border-line rounded-md px-3 py-2 focus:border-amber outline-none stat-figure"
+          className="w-full bg-panel2 border border-line rounded-md px-3 py-2 focus:border-red outline-none stat-figure"
         />
       </div>
       <div>
@@ -237,7 +237,7 @@ function NewGameForm({ teams, onCancel, onCreated }) {
           type="number"
           value={homeScore}
           onChange={(e) => setHomeScore(e.target.value)}
-          className="w-full bg-panel2 border border-line rounded-md px-3 py-2 focus:border-amber outline-none stat-figure"
+          className="w-full bg-panel2 border border-line rounded-md px-3 py-2 focus:border-red outline-none stat-figure"
         />
       </div>
 
@@ -250,7 +250,7 @@ function NewGameForm({ teams, onCancel, onCreated }) {
         <button
           type="submit"
           disabled={saving}
-          className="bg-amber text-court font-semibold text-sm rounded-md px-4 py-2 hover:bg-amber/90 disabled:opacity-60"
+          className="bg-red text-white font-semibold text-sm rounded-md px-4 py-2 hover:bg-red/90 disabled:opacity-60"
         >
           {saving ? 'Saving…' : 'Save game'}
         </button>
@@ -435,7 +435,7 @@ function RosterTable({
         </h3>
         <label
           htmlFor={fileInputId}
-          className="text-xs bg-panel2 border border-line hover:border-amber text-chalk rounded-md px-3 py-1.5 cursor-pointer"
+          className="text-xs bg-panel2 border border-line hover:border-red text-chalk rounded-md px-3 py-1.5 cursor-pointer"
         >
           {importing[side] ? 'Importing…' : 'Import Hudl file'}
         </label>
@@ -453,7 +453,7 @@ function RosterTable({
       </div>
 
       {unmatchedRows.length > 0 && (
-        <div className="bg-panel2 border border-amber/40 rounded-lg p-4 mb-3 space-y-2">
+        <div className="bg-panel2 border border-red/40 rounded-lg p-4 mb-3 space-y-2">
           <p className="text-xs text-chalkdim">
             These jersey numbers from the file don't match anyone on this roster yet. Name them to add the player and save their stats:
           </p>
@@ -466,11 +466,11 @@ function RosterTable({
                 onChange={(e) =>
                   setNewNames((p) => ({ ...p, [`${side}-${row.jersey}`]: e.target.value }))
                 }
-                className="flex-1 bg-panel border border-line rounded-md px-3 py-1.5 text-sm focus:border-amber outline-none"
+                className="flex-1 bg-panel border border-line rounded-md px-3 py-1.5 text-sm focus:border-red outline-none"
               />
               <button
                 onClick={() => addUnmatchedPlayer(side, teamId, row, setRoster)}
-                className="text-xs bg-amber text-court font-semibold rounded-md px-3 py-1.5 hover:bg-amber/90"
+                className="text-xs bg-red text-white font-semibold rounded-md px-3 py-1.5 hover:bg-red/90"
               >
                 Add & save
               </button>
@@ -507,14 +507,14 @@ function RosterTable({
                         type="number"
                         value={row[f.key] ?? ''}
                         onChange={(e) => updateField(p.id, f.key, e.target.value)}
-                        className="w-14 bg-panel2 border border-line rounded px-1.5 py-1 text-center stat-figure focus:border-amber outline-none"
+                        className="w-14 bg-panel2 border border-line rounded px-1.5 py-1 text-center stat-figure focus:border-red outline-none"
                       />
                     </td>
                   ))}
                   <td className="px-3 py-1.5 text-right">
                     <button
                       onClick={() => saveRow(p.id)}
-                      className="text-xs text-amber hover:text-amber/80"
+                      className="text-xs text-red hover:text-red/80"
                     >
                       {savingIds[p.id] ? 'Saving…' : 'Save'}
                     </button>
