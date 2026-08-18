@@ -353,112 +353,6 @@ function GameDetail({ game, onBack }) {
     setUnmatched((p) => ({ ...p, [side]: p[side].filter((r) => r.jersey !== row.jersey) }))
   }
 
-  function RosterTable({ roster, setRoster, teamId, side, label }) {
-    const fileInputId = `hudl-import-${side}`
-    const unmatchedRows = unmatched[side] || []
-
-    return (
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="font-display text-xl font-semibold text-chalkdim uppercase tracking-wide text-sm">
-            {label}
-          </h3>
-          <label
-            htmlFor={fileInputId}
-            className="text-xs bg-panel2 border border-line hover:border-amber text-chalk rounded-md px-3 py-1.5 cursor-pointer"
-          >
-            {importing[side] ? 'Importing…' : 'Import Hudl file'}
-          </label>
-          <input
-            id={fileInputId}
-            type="file"
-            accept=".txt,.csv,text/plain"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0]
-              if (file) handleImportFile(file, side, roster, teamId)
-              e.target.value = ''
-            }}
-          />
-        </div>
-
-        {unmatchedRows.length > 0 && (
-          <div className="bg-panel2 border border-amber/40 rounded-lg p-4 mb-3 space-y-2">
-            <p className="text-xs text-chalkdim">
-              These jersey numbers from the file don't match anyone on this roster yet. Name them to add the player and save their stats:
-            </p>
-            {unmatchedRows.map((row) => (
-              <div key={row.jersey} className="flex items-center gap-2">
-                <span className="stat-figure text-sm w-10 shrink-0">#{row.jersey}</span>
-                <input
-                  placeholder="Player name"
-                  value={newNames[`${side}-${row.jersey}`] || ''}
-                  onChange={(e) =>
-                    setNewNames((p) => ({ ...p, [`${side}-${row.jersey}`]: e.target.value }))
-                  }
-                  className="flex-1 bg-panel border border-line rounded-md px-3 py-1.5 text-sm focus:border-amber outline-none"
-                />
-                <button
-                  onClick={() => addUnmatchedPlayer(side, teamId, row, setRoster)}
-                  className="text-xs bg-amber text-court font-semibold rounded-md px-3 py-1.5 hover:bg-amber/90"
-                >
-                  Add & save
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        <div className="bg-panel border border-line rounded-lg overflow-x-auto">
-          <table className="w-full text-sm min-w-[640px]">
-            <thead>
-              <tr className="text-chalkdim text-xs uppercase tracking-wide border-b border-line">
-                <th className="text-left px-3 py-2 font-medium">Player</th>
-                {STAT_FIELDS.map((f) => (
-                  <th key={f.key} className="px-2 py-2 font-medium text-center">{f.label}</th>
-                ))}
-                <th className="px-3 py-2"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {roster.map((p) => {
-                const row = statsByPlayer[p.id] || {}
-                return (
-                  <tr key={p.id} className="border-b border-line last:border-0">
-                    <td className="px-3 py-2 font-medium whitespace-nowrap">
-                      {p.jersey_number != null && (
-                        <span className="text-chalkdim stat-figure mr-1.5">#{p.jersey_number}</span>
-                      )}
-                      {p.name}
-                    </td>
-                    {STAT_FIELDS.map((f) => (
-                      <td key={f.key} className="px-1 py-1.5">
-                        <input
-                          type="number"
-                          value={row[f.key] ?? ''}
-                          onChange={(e) => updateField(p.id, f.key, e.target.value)}
-                          className="w-14 bg-panel2 border border-line rounded px-1.5 py-1 text-center stat-figure focus:border-amber outline-none"
-                        />
-                      </td>
-                    ))}
-                    <td className="px-3 py-1.5 text-right">
-                      <button
-                        onClick={() => saveRow(p.id)}
-                        className="text-xs text-amber hover:text-amber/80"
-                      >
-                        {savingIds[p.id] ? 'Saving…' : 'Save'}
-                      </button>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div>
       <button onClick={onBack} className="text-sm text-chalkdim hover:text-chalk mb-4">
@@ -479,6 +373,16 @@ function GameDetail({ game, onBack }) {
             teamId={game.away_team_id}
             side="away"
             label={game.away_team?.name}
+            statsByPlayer={statsByPlayer}
+            updateField={updateField}
+            saveRow={saveRow}
+            savingIds={savingIds}
+            unmatched={unmatched}
+            importing={importing}
+            newNames={newNames}
+            setNewNames={setNewNames}
+            handleImportFile={handleImportFile}
+            addUnmatchedPlayer={addUnmatchedPlayer}
           />
           <RosterTable
             roster={homeRoster}
@@ -486,9 +390,141 @@ function GameDetail({ game, onBack }) {
             teamId={game.home_team_id}
             side="home"
             label={game.home_team?.name}
+            statsByPlayer={statsByPlayer}
+            updateField={updateField}
+            saveRow={saveRow}
+            savingIds={savingIds}
+            unmatched={unmatched}
+            importing={importing}
+            newNames={newNames}
+            setNewNames={setNewNames}
+            handleImportFile={handleImportFile}
+            addUnmatchedPlayer={addUnmatchedPlayer}
           />
         </>
       )}
+    </div>
+  )
+}
+
+function RosterTable({
+  roster,
+  setRoster,
+  teamId,
+  side,
+  label,
+  statsByPlayer,
+  updateField,
+  saveRow,
+  savingIds,
+  unmatched,
+  importing,
+  newNames,
+  setNewNames,
+  handleImportFile,
+  addUnmatchedPlayer,
+}) {
+  const fileInputId = `hudl-import-${side}`
+  const unmatchedRows = unmatched[side] || []
+
+  return (
+    <div className="mb-8">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-display text-xl font-semibold text-chalkdim uppercase tracking-wide text-sm">
+          {label}
+        </h3>
+        <label
+          htmlFor={fileInputId}
+          className="text-xs bg-panel2 border border-line hover:border-amber text-chalk rounded-md px-3 py-1.5 cursor-pointer"
+        >
+          {importing[side] ? 'Importing…' : 'Import Hudl file'}
+        </label>
+        <input
+          id={fileInputId}
+          type="file"
+          accept=".txt,.csv,text/plain"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0]
+            if (file) handleImportFile(file, side, roster, teamId)
+            e.target.value = ''
+          }}
+        />
+      </div>
+
+      {unmatchedRows.length > 0 && (
+        <div className="bg-panel2 border border-amber/40 rounded-lg p-4 mb-3 space-y-2">
+          <p className="text-xs text-chalkdim">
+            These jersey numbers from the file don't match anyone on this roster yet. Name them to add the player and save their stats:
+          </p>
+          {unmatchedRows.map((row) => (
+            <div key={row.jersey} className="flex items-center gap-2">
+              <span className="stat-figure text-sm w-10 shrink-0">#{row.jersey}</span>
+              <input
+                placeholder="Player name"
+                value={newNames[`${side}-${row.jersey}`] || ''}
+                onChange={(e) =>
+                  setNewNames((p) => ({ ...p, [`${side}-${row.jersey}`]: e.target.value }))
+                }
+                className="flex-1 bg-panel border border-line rounded-md px-3 py-1.5 text-sm focus:border-amber outline-none"
+              />
+              <button
+                onClick={() => addUnmatchedPlayer(side, teamId, row, setRoster)}
+                className="text-xs bg-amber text-court font-semibold rounded-md px-3 py-1.5 hover:bg-amber/90"
+              >
+                Add & save
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="bg-panel border border-line rounded-lg overflow-x-auto">
+        <table className="w-full text-sm min-w-[640px]">
+          <thead>
+            <tr className="text-chalkdim text-xs uppercase tracking-wide border-b border-line">
+              <th className="text-left px-3 py-2 font-medium">Player</th>
+              {STAT_FIELDS.map((f) => (
+                <th key={f.key} className="px-2 py-2 font-medium text-center">{f.label}</th>
+              ))}
+              <th className="px-3 py-2"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {roster.map((p) => {
+              const row = statsByPlayer[p.id] || {}
+              return (
+                <tr key={p.id} className="border-b border-line last:border-0">
+                  <td className="px-3 py-2 font-medium whitespace-nowrap">
+                    {p.jersey_number != null && (
+                      <span className="text-chalkdim stat-figure mr-1.5">#{p.jersey_number}</span>
+                    )}
+                    {p.name}
+                  </td>
+                  {STAT_FIELDS.map((f) => (
+                    <td key={f.key} className="px-1 py-1.5">
+                      <input
+                        type="number"
+                        value={row[f.key] ?? ''}
+                        onChange={(e) => updateField(p.id, f.key, e.target.value)}
+                        className="w-14 bg-panel2 border border-line rounded px-1.5 py-1 text-center stat-figure focus:border-amber outline-none"
+                      />
+                    </td>
+                  ))}
+                  <td className="px-3 py-1.5 text-right">
+                    <button
+                      onClick={() => saveRow(p.id)}
+                      className="text-xs text-amber hover:text-amber/80"
+                    >
+                      {savingIds[p.id] ? 'Saving…' : 'Save'}
+                    </button>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }
