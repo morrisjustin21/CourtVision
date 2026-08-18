@@ -12,6 +12,43 @@ const STAT_FIELDS = [
   { key: 'minutes', label: 'MIN' },
 ]
 
+// Hudl's exported box score is pipe-delimited: a game-id line, a header line,
+// then one line per player keyed by jersey number (no player names included).
+// Maps Hudl's column names to this app's stat fields.
+const HUDL_COLUMN_MAP = {
+  Points: 'points',
+  Rebounds: 'rebounds',
+  Assists: 'assists',
+  Steals: 'steals',
+  BlockedShots: 'blocks',
+  Turnovers: 'turnovers',
+  PersonalFouls: 'fouls',
+}
+
+function parseHudlBoxScore(text) {
+  const lines = text.trim().split(/\r?\n/).filter(Boolean)
+  if (lines.length < 3) return []
+  const header = lines[1].split('|')
+  const jerseyIdx = header.indexOf('Jersey')
+  if (jerseyIdx === -1) return []
+
+  const fieldIdx = {}
+  Object.entries(HUDL_COLUMN_MAP).forEach(([hudlKey, ourKey]) => {
+    const idx = header.indexOf(hudlKey)
+    if (idx !== -1) fieldIdx[ourKey] = idx
+  })
+
+  return lines.slice(2).map((line) => {
+    const cols = line.split('|')
+    const jersey = parseInt(cols[jerseyIdx], 10)
+    const stats = {}
+    Object.entries(fieldIdx).forEach(([ourKey, idx]) => {
+      stats[ourKey] = parseInt(cols[idx], 10) || 0
+    })
+    return { jersey, stats }
+  }).filter((row) => !Number.isNaN(row.jersey))
+}
+
 export default function Games() {
   const [games, setGames] = useState([])
   const [teams, setTeams] = useState([])
@@ -271,12 +308,107 @@ function GameDetail({ game, onBack }) {
     setSavingIds((p) => ({ ...p, [playerId]: false }))
   }
 
-  function RosterTable({ roster, label }) {
+  async function saveStatsForPlayer(playerId, stats) {
+    const payload = { game_id: game.id, player_id: playerId }
+    STAT_FIELDS.forEach((f) => {
+      payload[f.key] = stats[f.key] ?? 0
+    })
+    await supabase.from('player_game_stats').upsert(payload, { onConflict: 'game_id,player_id' })
+    setStatsByPlayer((prev) => ({ ...prev, [playerId]: payload }))
+  }
+
+  const [unmatched, setUnmatched] = useState({ home: [], away: [] })
+  const [newNames, setNewNames] = useState({})
+  const [importing, setImporting] = useState({})
+
+  async function handleImportFile(file, side, roster, teamId) {
+    setImporting((p) => ({ ...p, [side]: true }))
+    const text = await file.text()
+    const rows = parseHudlBoxScore(text)
+
+    const stillUnmatched = []
+    for (const row of rows) {
+      const player = roster.find((p) => p.jersey_number === row.jersey)
+      if (player) {
+        await saveStatsForPlayer(player.id, row.stats)
+      } else {
+        stillUnmatched.push(row)
+      }
+    }
+    setUnmatched((p) => ({ ...p, [side]: stillUnmatched }))
+    setImporting((p) => ({ ...p, [side]: false }))
+  }
+
+  async function addUnmatchedPlayer(side, teamId, row, setRoster) {
+    const name = newNames[`${side}-${row.jersey}`]
+    if (!name) return
+    const { data } = await supabase
+      .from('players')
+      .insert({ team_id: teamId, name, jersey_number: row.jersey })
+      .select()
+      .single()
+    if (!data) return
+    setRoster((prev) => [...prev, data].sort((a, b) => (a.jersey_number ?? 0) - (b.jersey_number ?? 0)))
+    await saveStatsForPlayer(data.id, row.stats)
+    setUnmatched((p) => ({ ...p, [side]: p[side].filter((r) => r.jersey !== row.jersey) }))
+  }
+
+  function RosterTable({ roster, setRoster, teamId, side, label }) {
+    const fileInputId = `hudl-import-${side}`
+    const unmatchedRows = unmatched[side] || []
+
     return (
       <div className="mb-8">
-        <h3 className="font-display text-xl font-semibold mb-3 text-chalkdim uppercase tracking-wide text-sm">
-          {label}
-        </h3>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-display text-xl font-semibold text-chalkdim uppercase tracking-wide text-sm">
+            {label}
+          </h3>
+          <label
+            htmlFor={fileInputId}
+            className="text-xs bg-panel2 border border-line hover:border-amber text-chalk rounded-md px-3 py-1.5 cursor-pointer"
+          >
+            {importing[side] ? 'Importing…' : 'Import Hudl file'}
+          </label>
+          <input
+            id={fileInputId}
+            type="file"
+            accept=".txt,.csv,text/plain"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) handleImportFile(file, side, roster, teamId)
+              e.target.value = ''
+            }}
+          />
+        </div>
+
+        {unmatchedRows.length > 0 && (
+          <div className="bg-panel2 border border-amber/40 rounded-lg p-4 mb-3 space-y-2">
+            <p className="text-xs text-chalkdim">
+              These jersey numbers from the file don't match anyone on this roster yet. Name them to add the player and save their stats:
+            </p>
+            {unmatchedRows.map((row) => (
+              <div key={row.jersey} className="flex items-center gap-2">
+                <span className="stat-figure text-sm w-10 shrink-0">#{row.jersey}</span>
+                <input
+                  placeholder="Player name"
+                  value={newNames[`${side}-${row.jersey}`] || ''}
+                  onChange={(e) =>
+                    setNewNames((p) => ({ ...p, [`${side}-${row.jersey}`]: e.target.value }))
+                  }
+                  className="flex-1 bg-panel border border-line rounded-md px-3 py-1.5 text-sm focus:border-amber outline-none"
+                />
+                <button
+                  onClick={() => addUnmatchedPlayer(side, teamId, row, setRoster)}
+                  className="text-xs bg-amber text-court font-semibold rounded-md px-3 py-1.5 hover:bg-amber/90"
+                >
+                  Add & save
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
         <div className="bg-panel border border-line rounded-lg overflow-x-auto">
           <table className="w-full text-sm min-w-[640px]">
             <thead>
@@ -341,8 +473,20 @@ function GameDetail({ game, onBack }) {
         <p className="text-chalkdim">Loading…</p>
       ) : (
         <>
-          <RosterTable roster={awayRoster} label={game.away_team?.name} />
-          <RosterTable roster={homeRoster} label={game.home_team?.name} />
+          <RosterTable
+            roster={awayRoster}
+            setRoster={setAwayRoster}
+            teamId={game.away_team_id}
+            side="away"
+            label={game.away_team?.name}
+          />
+          <RosterTable
+            roster={homeRoster}
+            setRoster={setHomeRoster}
+            teamId={game.home_team_id}
+            side="home"
+            label={game.home_team?.name}
+          />
         </>
       )}
     </div>
