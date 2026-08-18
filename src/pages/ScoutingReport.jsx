@@ -20,6 +20,33 @@ function StatCard({ label, value, sub }) {
   )
 }
 
+function LeaderboardCard({ title, players, statKey, suffix }) {
+  if (players.length === 0) return null
+  return (
+    <div className="bg-panel border border-line rounded-lg overflow-hidden">
+      <p className="text-xs uppercase tracking-wide text-chalkdim px-4 pt-3 pb-2">{title}</p>
+      <table className="w-full text-sm">
+        <tbody>
+          {players.map((p, i) => (
+            <tr key={p.id} className="border-b border-line last:border-0">
+              <td className="pl-4 pr-2 py-2 stat-figure text-chalkdim text-xs w-6">{i + 1}</td>
+              <td className="px-2 py-2 font-medium whitespace-nowrap">
+                {p.jersey_number != null && (
+                  <span className="text-chalkdim stat-figure mr-1.5">#{p.jersey_number}</span>
+                )}
+                {p.name}
+              </td>
+              <td className="px-4 py-2 text-right stat-figure text-red font-semibold whitespace-nowrap">
+                {p[statKey].toFixed(1)} {suffix}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 export default function ScoutingReport({ team, notes, setNotes, onSaveNotes, savingNotes, savedAt }) {
   const [loading, setLoading] = useState(true)
   const [statsRows, setStatsRows] = useState([])
@@ -100,22 +127,80 @@ export default function ScoutingReport({ team, notes, setNotes, onSaveNotes, sav
     }
   }, [statsRows])
 
-  const topPerformers = useMemo(() => {
+  const playerAgg = useMemo(() => {
     const byPlayer = {}
     statsRows.forEach((r) => {
       const p = r.player
       if (!p) return
       if (!byPlayer[p.id]) {
-        byPlayer[p.id] = { id: p.id, name: p.name, jersey_number: p.jersey_number, games: 0, points: 0 }
+        byPlayer[p.id] = {
+          id: p.id,
+          name: p.name,
+          jersey_number: p.jersey_number,
+          games: 0,
+          points: 0,
+          rebounds: 0,
+          assists: 0,
+          steals: 0,
+          blocks: 0,
+          turnovers: 0,
+          fgMade: 0,
+          fgAtt: 0,
+          ftMade: 0,
+          ftAtt: 0,
+        }
       }
-      byPlayer[p.id].games += 1
-      byPlayer[p.id].points += r.points || 0
+      const agg = byPlayer[p.id]
+      agg.games += 1
+      agg.points += r.points || 0
+      agg.rebounds += r.rebounds || 0
+      agg.assists += r.assists || 0
+      agg.steals += r.steals || 0
+      agg.blocks += r.blocks || 0
+      agg.turnovers += r.turnovers || 0
+      agg.fgMade += (r.two_made || 0) + (r.three_made || 0)
+      agg.fgAtt += (r.two_att || 0) + (r.three_att || 0)
+      agg.ftMade += r.ft_made || 0
+      agg.ftAtt += r.ft_att || 0
     })
-    return Object.values(byPlayer)
-      .map((p) => ({ ...p, ppg: p.games ? p.points / p.games : 0 }))
-      .sort((a, b) => b.ppg - a.ppg)
-      .slice(0, 5)
+
+    return Object.values(byPlayer).map((p) => {
+      const missedFg = p.fgAtt - p.fgMade
+      const missedFt = p.ftAtt - p.ftMade
+      // Standard box-score efficiency rating: production minus missed shots and turnovers.
+      const eff = p.points + p.rebounds + p.assists + p.steals + p.blocks - missedFg - missedFt - p.turnovers
+      return {
+        ...p,
+        ppg: p.games ? p.points / p.games : 0,
+        rpg: p.games ? p.rebounds / p.games : 0,
+        apg: p.games ? p.assists / p.games : 0,
+        spg: p.games ? p.steals / p.games : 0,
+        bpg: p.games ? p.blocks / p.games : 0,
+        effpg: p.games ? eff / p.games : 0,
+      }
+    })
   }, [statsRows])
+
+  const topScorers = useMemo(
+    () => [...playerAgg].sort((a, b) => b.ppg - a.ppg).slice(0, 5),
+    [playerAgg]
+  )
+  const topRebounders = useMemo(
+    () => [...playerAgg].sort((a, b) => b.rpg - a.rpg).slice(0, 5),
+    [playerAgg]
+  )
+  const topAssists = useMemo(
+    () => [...playerAgg].sort((a, b) => b.apg - a.apg).slice(0, 5),
+    [playerAgg]
+  )
+  const topSteals = useMemo(
+    () => [...playerAgg].sort((a, b) => b.spg - a.spg).slice(0, 5),
+    [playerAgg]
+  )
+  const top3Players = useMemo(
+    () => [...playerAgg].sort((a, b) => b.effpg - a.effpg).slice(0, 3),
+    [playerAgg]
+  )
 
   if (loading) return <p className="text-chalkdim">Loading…</p>
 
@@ -167,35 +252,44 @@ export default function ScoutingReport({ team, notes, setNotes, onSaveNotes, sav
         />
       </div>
 
-      {topPerformers.length > 0 && (
+      {top3Players.length > 0 && (
         <>
           <h3 className="font-display text-xl font-semibold text-chalkdim uppercase tracking-wide text-sm mb-3">
-            Top scorers
+            Top 3 Players
           </h3>
-          <div className="bg-panel border border-line rounded-lg overflow-hidden mb-6">
-            <table className="w-full text-sm">
-              <tbody>
-                {topPerformers.map((p) => (
-                  <tr key={p.id} className="border-b border-line last:border-0">
-                    <td className="px-4 py-2.5 font-medium whitespace-nowrap">
-                      {p.jersey_number != null && (
-                        <span className="text-chalkdim stat-figure mr-1.5">#{p.jersey_number}</span>
-                      )}
-                      {p.name}
-                    </td>
-                    <td className="px-4 py-2.5 text-right stat-figure text-red font-semibold">
-                      {p.ppg.toFixed(1)} PPG
-                    </td>
-                    <td className="px-4 py-2.5 text-right stat-figure text-chalkdim text-xs w-20">
-                      {p.games} GP
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+            {top3Players.map((p, i) => (
+              <div key={p.id} className="bg-panel border border-red/40 rounded-lg p-4 relative overflow-hidden">
+                <span className="absolute top-3 right-4 font-display text-4xl font-bold text-line select-none">
+                  {i + 1}
+                </span>
+                <p className="font-medium mb-0.5">
+                  {p.jersey_number != null && (
+                    <span className="text-chalkdim stat-figure mr-1.5">#{p.jersey_number}</span>
+                  )}
+                  {p.name}
+                </p>
+                <p className="text-xs text-chalkdim mb-3">{p.games} GP</p>
+                <p className="text-xs text-chalkdim">
+                  <span className="text-red font-semibold stat-figure">{p.ppg.toFixed(1)}</span> PPG ·{' '}
+                  <span className="text-red font-semibold stat-figure">{p.rpg.toFixed(1)}</span> RPG ·{' '}
+                  <span className="text-red font-semibold stat-figure">{p.apg.toFixed(1)}</span> APG
+                </p>
+              </div>
+            ))}
           </div>
         </>
       )}
+
+      <h3 className="font-display text-xl font-semibold text-chalkdim uppercase tracking-wide text-sm mb-3">
+        Leaders by category
+      </h3>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+        <LeaderboardCard title="Scoring" players={topScorers} statKey="ppg" suffix="PPG" />
+        <LeaderboardCard title="Rebounding" players={topRebounders} statKey="rpg" suffix="RPG" />
+        <LeaderboardCard title="Assists" players={topAssists} statKey="apg" suffix="APG" />
+        <LeaderboardCard title="Steals" players={topSteals} statKey="spg" suffix="SPG" />
+      </div>
 
       <NotesSection notes={notes} setNotes={setNotes} onSave={onSaveNotes} saving={savingNotes} savedAt={savedAt} />
     </div>
