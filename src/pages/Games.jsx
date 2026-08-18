@@ -49,12 +49,23 @@ function parseHudlBoxScore(text) {
   }).filter((row) => !Number.isNaN(row.jersey))
 }
 
+// Basketball seasons usually span two calendar years (e.g. a game in
+// Nov 2025 and a game in Feb 2026 are both part of the "2025-26" season).
+// This guesses a sensible default; the season field is always editable.
+function guessSeason(dateStr) {
+  if (!dateStr) return ''
+  const [year, month] = dateStr.split('-').map(Number)
+  if (month >= 7) return `${year}-${String(year + 1).slice(2)}`
+  return `${year - 1}-${String(year).slice(2)}`
+}
+
 export default function Games() {
   const [games, setGames] = useState([])
   const [teams, setTeams] = useState([])
   const [loading, setLoading] = useState(true)
   const [showNewGame, setShowNewGame] = useState(false)
   const [selectedGame, setSelectedGame] = useState(null)
+  const [seasonFilter, setSeasonFilter] = useState('all')
 
   async function loadAll() {
     setLoading(true)
@@ -74,6 +85,9 @@ export default function Games() {
     loadAll()
   }, [])
 
+  const seasons = [...new Set(games.map((g) => g.season).filter(Boolean))].sort().reverse()
+  const filteredGames = seasonFilter === 'all' ? games : games.filter((g) => g.season === seasonFilter)
+
   if (selectedGame) {
     return (
       <GameDetail
@@ -88,16 +102,30 @@ export default function Games() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <h1 className="font-display text-4xl font-bold">Games</h1>
-        <button
-          onClick={() => setShowNewGame(true)}
-          className="bg-red text-white font-semibold text-sm rounded-md px-4 py-2 hover:bg-red/90"
-          disabled={teams.length < 2}
-          title={teams.length < 2 ? 'Add at least 2 teams first' : ''}
-        >
-          + Log game
-        </button>
+        <div className="flex items-center gap-2">
+          {seasons.length > 0 && (
+            <select
+              value={seasonFilter}
+              onChange={(e) => setSeasonFilter(e.target.value)}
+              className="bg-panel2 border border-line rounded-md px-3 py-2 text-sm focus:border-red outline-none"
+            >
+              <option value="all">All seasons</option>
+              {seasons.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          )}
+          <button
+            onClick={() => setShowNewGame(true)}
+            className="bg-red text-white font-semibold text-sm rounded-md px-4 py-2 hover:bg-red/90"
+            disabled={teams.length < 2}
+            title={teams.length < 2 ? 'Add at least 2 teams first' : ''}
+          >
+            + Log game
+          </button>
+        </div>
       </div>
 
       {teams.length < 2 && (
@@ -105,10 +133,11 @@ export default function Games() {
       )}
 
       {showNewGame && (
-        <NewGameForm
+        <GameForm
           teams={teams}
+          seasons={seasons}
           onCancel={() => setShowNewGame(false)}
-          onCreated={() => {
+          onSaved={() => {
             setShowNewGame(false)
             loadAll()
           }}
@@ -117,13 +146,13 @@ export default function Games() {
 
       {loading ? (
         <p className="text-chalkdim">Loading…</p>
-      ) : games.length === 0 ? (
+      ) : filteredGames.length === 0 ? (
         <div className="border border-dashed border-line rounded-lg p-10 text-center text-chalkdim">
-          No games logged yet.
+          {games.length === 0 ? 'No games logged yet.' : 'No games in this season.'}
         </div>
       ) : (
         <div className="space-y-2">
-          {games.map((g) => (
+          {filteredGames.map((g) => (
             <button
               key={g.id}
               onClick={() => setSelectedGame(g)}
@@ -131,6 +160,11 @@ export default function Games() {
             >
               <div className="flex items-center gap-4">
                 <span className="text-xs text-chalkdim w-24 shrink-0">{g.game_date}</span>
+                {g.season && (
+                  <span className="text-[10px] uppercase tracking-wide text-chalkdim border border-line rounded-full px-2 py-0.5 shrink-0">
+                    {g.season}
+                  </span>
+                )}
                 <span className="font-medium">{g.away_team?.name}</span>
                 <span className="stat-figure font-display text-xl font-bold">
                   {g.away_score ?? '–'}
@@ -150,14 +184,23 @@ export default function Games() {
   )
 }
 
-function NewGameForm({ teams, onCancel, onCreated }) {
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
-  const [homeTeamId, setHomeTeamId] = useState('')
-  const [awayTeamId, setAwayTeamId] = useState('')
-  const [homeScore, setHomeScore] = useState('')
-  const [awayScore, setAwayScore] = useState('')
+function GameForm({ teams, seasons = [], game, onCancel, onSaved }) {
+  const [date, setDate] = useState(game?.game_date || new Date().toISOString().slice(0, 10))
+  const [season, setSeason] = useState(game?.season || guessSeason(game?.game_date || new Date().toISOString().slice(0, 10)))
+  const [homeTeamId, setHomeTeamId] = useState(game?.home_team_id || '')
+  const [awayTeamId, setAwayTeamId] = useState(game?.away_team_id || '')
+  const [homeScore, setHomeScore] = useState(game?.home_score ?? '')
+  const [awayScore, setAwayScore] = useState(game?.away_score ?? '')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+
+  function handleDateChange(value) {
+    setDate(value)
+    // Only auto-fill season if the user hasn't already typed a custom one.
+    if (!season || season === guessSeason(date)) {
+      setSeason(guessSeason(value))
+    }
+  }
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -167,15 +210,22 @@ function NewGameForm({ teams, onCancel, onCreated }) {
     }
     setError('')
     setSaving(true)
-    await supabase.from('games').insert({
+    const payload = {
       game_date: date,
+      season: season || null,
       home_team_id: homeTeamId,
       away_team_id: awayTeamId,
-      home_score: homeScore ? parseInt(homeScore, 10) : null,
-      away_score: awayScore ? parseInt(awayScore, 10) : null,
-    })
+      home_score: homeScore === '' ? null : parseInt(homeScore, 10),
+      away_score: awayScore === '' ? null : parseInt(awayScore, 10),
+    }
+    let result
+    if (game) {
+      result = await supabase.from('games').update(payload).eq('id', game.id).select().single()
+    } else {
+      result = await supabase.from('games').insert(payload).select().single()
+    }
     setSaving(false)
-    onCreated()
+    onSaved(result.data)
   }
 
   return (
@@ -189,18 +239,33 @@ function NewGameForm({ teams, onCancel, onCreated }) {
           type="date"
           required
           value={date}
-          onChange={(e) => setDate(e.target.value)}
+          onChange={(e) => handleDateChange(e.target.value)}
           className="w-full bg-panel2 border border-line rounded-md px-3 py-2 focus:border-red outline-none"
         />
       </div>
-      <div />
+      <div>
+        <label className="block text-xs uppercase tracking-wide text-chalkdim mb-1.5">Season</label>
+        <input
+          list="season-suggestions"
+          value={season}
+          onChange={(e) => setSeason(e.target.value)}
+          placeholder="2025-26"
+          className="w-full bg-panel2 border border-line rounded-md px-3 py-2 focus:border-red outline-none"
+        />
+        <datalist id="season-suggestions">
+          {seasons.map((s) => (
+            <option key={s} value={s} />
+          ))}
+        </datalist>
+      </div>
       <div>
         <label className="block text-xs uppercase tracking-wide text-chalkdim mb-1.5">Away team</label>
         <select
           required
+          disabled={!!game}
           value={awayTeamId}
           onChange={(e) => setAwayTeamId(e.target.value)}
-          className="w-full bg-panel2 border border-line rounded-md px-3 py-2 focus:border-red outline-none"
+          className="w-full bg-panel2 border border-line rounded-md px-3 py-2 focus:border-red outline-none disabled:opacity-60"
         >
           <option value="">Select team</option>
           {teams.map((t) => (
@@ -212,9 +277,10 @@ function NewGameForm({ teams, onCancel, onCreated }) {
         <label className="block text-xs uppercase tracking-wide text-chalkdim mb-1.5">Home team</label>
         <select
           required
+          disabled={!!game}
           value={homeTeamId}
           onChange={(e) => setHomeTeamId(e.target.value)}
-          className="w-full bg-panel2 border border-line rounded-md px-3 py-2 focus:border-red outline-none"
+          className="w-full bg-panel2 border border-line rounded-md px-3 py-2 focus:border-red outline-none disabled:opacity-60"
         >
           <option value="">Select team</option>
           {teams.map((t) => (
@@ -222,6 +288,11 @@ function NewGameForm({ teams, onCancel, onCreated }) {
           ))}
         </select>
       </div>
+      {game && (
+        <p className="text-xs text-chalkdim sm:col-span-2 -mt-2">
+          Teams can't be changed after a game is created, since box scores are already tied to each roster.
+        </p>
+      )}
       <div>
         <label className="block text-xs uppercase tracking-wide text-chalkdim mb-1.5">Away score (optional)</label>
         <input
@@ -252,19 +323,21 @@ function NewGameForm({ teams, onCancel, onCreated }) {
           disabled={saving}
           className="bg-red text-white font-semibold text-sm rounded-md px-4 py-2 hover:bg-red/90 disabled:opacity-60"
         >
-          {saving ? 'Saving…' : 'Save game'}
+          {saving ? 'Saving…' : game ? 'Save changes' : 'Save game'}
         </button>
       </div>
     </form>
   )
 }
 
-function GameDetail({ game, onBack }) {
+function GameDetail({ game: initialGame, onBack }) {
+  const [game, setGame] = useState(initialGame)
   const [homeRoster, setHomeRoster] = useState([])
   const [awayRoster, setAwayRoster] = useState([])
   const [statsByPlayer, setStatsByPlayer] = useState({})
   const [loading, setLoading] = useState(true)
   const [savingIds, setSavingIds] = useState({})
+  const [showEditGame, setShowEditGame] = useState(false)
 
   async function loadData() {
     setLoading(true)
@@ -358,10 +431,45 @@ function GameDetail({ game, onBack }) {
       <button onClick={onBack} className="text-sm text-chalkdim hover:text-chalk mb-4">
         ← All games
       </button>
-      <h1 className="font-display text-4xl font-bold mb-1">
-        {game.away_team?.name} @ {game.home_team?.name}
-      </h1>
-      <p className="text-chalkdim text-sm mb-6">{game.game_date}</p>
+
+      {showEditGame ? (
+        <div className="mb-6">
+          <h1 className="font-display text-2xl font-semibold mb-3 text-chalkdim uppercase tracking-wide text-sm">
+            Edit game
+          </h1>
+          <GameForm
+            teams={[game.home_team, game.away_team].filter(Boolean)}
+            game={game}
+            onCancel={() => setShowEditGame(false)}
+            onSaved={(updated) => {
+              setShowEditGame(false)
+              if (updated) setGame((g) => ({ ...g, ...updated }))
+            }}
+          />
+        </div>
+      ) : (
+        <div className="flex items-start justify-between mb-6">
+          <div>
+            <h1 className="font-display text-4xl font-bold mb-1">
+              {game.away_team?.name} @ {game.home_team?.name}
+            </h1>
+            <p className="text-chalkdim text-sm flex items-center gap-2">
+              {game.game_date}
+              {game.season && (
+                <span className="text-[10px] uppercase tracking-wide text-chalkdim border border-line rounded-full px-2 py-0.5">
+                  {game.season}
+                </span>
+              )}
+            </p>
+          </div>
+          <button
+            onClick={() => setShowEditGame(true)}
+            className="bg-panel2 border border-line text-chalk font-medium text-sm rounded-md px-4 py-2 hover:border-red shrink-0"
+          >
+            Edit game
+          </button>
+        </div>
+      )}
 
       {loading ? (
         <p className="text-chalkdim">Loading…</p>

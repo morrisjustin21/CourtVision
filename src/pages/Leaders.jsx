@@ -10,59 +10,69 @@ const SORTABLE = [
 ]
 
 export default function Leaders() {
-  const [rows, setRows] = useState([])
+  const [rawRows, setRawRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [sortKey, setSortKey] = useState('ppg')
+  const [seasonFilter, setSeasonFilter] = useState('all')
 
   useEffect(() => {
     async function load() {
       setLoading(true)
       const { data } = await supabase
         .from('player_game_stats')
-        .select('*, player:player_id(id,name,jersey_number,team:team_id(id,name,color))')
+        .select('*, player:player_id(id,name,jersey_number,team:team_id(id,name,color)), game:game_id(id,season)')
       setLoading(false)
-      if (!data) return
-
-      const byPlayer = {}
-      data.forEach((row) => {
-        const p = row.player
-        if (!p) return
-        if (!byPlayer[p.id]) {
-          byPlayer[p.id] = {
-            id: p.id,
-            name: p.name,
-            jersey_number: p.jersey_number,
-            team: p.team?.name,
-            teamColor: p.team?.color,
-            games: 0,
-            points: 0,
-            rebounds: 0,
-            assists: 0,
-            steals: 0,
-            blocks: 0,
-          }
-        }
-        const agg = byPlayer[p.id]
-        agg.games += 1
-        agg.points += row.points || 0
-        agg.rebounds += row.rebounds || 0
-        agg.assists += row.assists || 0
-        agg.steals += row.steals || 0
-        agg.blocks += row.blocks || 0
-      })
-
-      const list = Object.values(byPlayer).map((p) => ({
-        ...p,
-        ppg: p.games ? p.points / p.games : 0,
-        rpg: p.games ? p.rebounds / p.games : 0,
-        apg: p.games ? p.assists / p.games : 0,
-        spg: p.games ? p.steals / p.games : 0,
-        bpg: p.games ? p.blocks / p.games : 0,
-      }))
-      setRows(list)
+      setRawRows(data || [])
     }
     load()
   }, [])
+
+  const seasons = useMemo(
+    () => [...new Set(rawRows.map((r) => r.game?.season).filter(Boolean))].sort().reverse(),
+    [rawRows]
+  )
+
+  const rows = useMemo(() => {
+    const filtered =
+      seasonFilter === 'all' ? rawRows : rawRows.filter((r) => r.game?.season === seasonFilter)
+
+    const byPlayer = {}
+    filtered.forEach((row) => {
+      const p = row.player
+      if (!p) return
+      if (!byPlayer[p.id]) {
+        byPlayer[p.id] = {
+          id: p.id,
+          name: p.name,
+          jersey_number: p.jersey_number,
+          team: p.team?.name,
+          teamColor: p.team?.color,
+          games: 0,
+          points: 0,
+          rebounds: 0,
+          assists: 0,
+          steals: 0,
+          blocks: 0,
+        }
+      }
+      const agg = byPlayer[p.id]
+      agg.games += 1
+      agg.points += row.points || 0
+      agg.rebounds += row.rebounds || 0
+      agg.assists += row.assists || 0
+      agg.steals += row.steals || 0
+      agg.blocks += row.blocks || 0
+    })
+
+    return Object.values(byPlayer).map((p) => ({
+      ...p,
+      ppg: p.games ? p.points / p.games : 0,
+      rpg: p.games ? p.rebounds / p.games : 0,
+      apg: p.games ? p.assists / p.games : 0,
+      spg: p.games ? p.steals / p.games : 0,
+      bpg: p.games ? p.blocks / p.games : 0,
+    }))
+  }, [rawRows, seasonFilter])
 
   const sorted = useMemo(
     () => [...rows].sort((a, b) => b[sortKey] - a[sortKey]),
@@ -73,18 +83,32 @@ export default function Leaders() {
     <div>
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <h1 className="font-display text-4xl font-bold">League Leaders</h1>
-        <div className="flex gap-1 bg-panel border border-line rounded-md p-1">
-          {SORTABLE.map((s) => (
-            <button
-              key={s.key}
-              onClick={() => setSortKey(s.key)}
-              className={`text-xs font-medium px-3 py-1.5 rounded ${
-                sortKey === s.key ? 'bg-red text-white' : 'text-chalkdim hover:text-chalk'
-              }`}
+        <div className="flex flex-wrap items-center gap-2">
+          {seasons.length > 0 && (
+            <select
+              value={seasonFilter}
+              onChange={(e) => setSeasonFilter(e.target.value)}
+              className="bg-panel2 border border-line rounded-md px-3 py-2 text-sm focus:border-red outline-none"
             >
-              {s.label}
-            </button>
-          ))}
+              <option value="all">All seasons</option>
+              {seasons.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          )}
+          <div className="flex gap-1 bg-panel border border-line rounded-md p-1">
+            {SORTABLE.map((s) => (
+              <button
+                key={s.key}
+                onClick={() => setSortKey(s.key)}
+                className={`text-xs font-medium px-3 py-1.5 rounded ${
+                  sortKey === s.key ? 'bg-red text-white' : 'text-chalkdim hover:text-chalk'
+                }`}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -92,7 +116,9 @@ export default function Leaders() {
         <p className="text-chalkdim">Loading…</p>
       ) : sorted.length === 0 ? (
         <div className="border border-dashed border-line rounded-lg p-10 text-center text-chalkdim">
-          No stats logged yet. Enter box scores from a game to see leaders here.
+          {rawRows.length === 0
+            ? 'No stats logged yet. Enter box scores from a game to see leaders here.'
+            : 'No stats logged for this season.'}
         </div>
       ) : (
         <div className="bg-panel border border-line rounded-lg overflow-x-auto">

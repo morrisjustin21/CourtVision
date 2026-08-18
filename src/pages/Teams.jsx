@@ -22,6 +22,7 @@ export default function Teams() {
     return (
       <TeamDetail
         team={selectedTeam}
+        onTeamUpdated={(updated) => setSelectedTeam(updated)}
         onBack={() => {
           setSelectedTeam(null)
           loadTeams()
@@ -43,9 +44,9 @@ export default function Teams() {
       </div>
 
       {showNewTeam && (
-        <NewTeamForm
+        <TeamForm
           onCancel={() => setShowNewTeam(false)}
-          onCreated={() => {
+          onSaved={() => {
             setShowNewTeam(false)
             loadTeams()
           }}
@@ -91,24 +92,32 @@ export default function Teams() {
   )
 }
 
-function NewTeamForm({ onCancel, onCreated }) {
-  const [name, setName] = useState('')
-  const [league, setLeague] = useState('')
-  const [division, setDivision] = useState('')
-  const [isMyTeam, setIsMyTeam] = useState(false)
+// Used for both creating a new team and editing an existing one.
+// Pass `team` to edit; omit it to create.
+function TeamForm({ team, onCancel, onSaved }) {
+  const [name, setName] = useState(team?.name || '')
+  const [league, setLeague] = useState(team?.league || '')
+  const [division, setDivision] = useState(team?.division || '')
+  const [isMyTeam, setIsMyTeam] = useState(team?.is_my_team || false)
   const [saving, setSaving] = useState(false)
 
   async function handleSubmit(e) {
     e.preventDefault()
     setSaving(true)
-    await supabase.from('teams').insert({
+    const payload = {
       name,
       league: league || null,
       division: division || null,
       is_my_team: isMyTeam,
-    })
+    }
+    let result
+    if (team) {
+      result = await supabase.from('teams').update(payload).eq('id', team.id).select().single()
+    } else {
+      result = await supabase.from('teams').insert(payload).select().single()
+    }
     setSaving(false)
-    onCreated()
+    onSaved(result.data)
   }
 
   return (
@@ -156,17 +165,20 @@ function NewTeamForm({ onCancel, onCreated }) {
           disabled={saving}
           className="bg-red text-white font-semibold text-sm rounded-md px-4 py-2 hover:bg-red/90 disabled:opacity-60"
         >
-          {saving ? 'Saving…' : 'Save team'}
+          {saving ? 'Saving…' : team ? 'Save changes' : 'Save team'}
         </button>
       </div>
     </form>
   )
 }
 
-function TeamDetail({ team, onBack }) {
+function TeamDetail({ team, onBack, onTeamUpdated }) {
   const [players, setPlayers] = useState([])
   const [loading, setLoading] = useState(true)
   const [showNewPlayer, setShowNewPlayer] = useState(false)
+  const [showEditTeam, setShowEditTeam] = useState(false)
+  const [editingPlayerId, setEditingPlayerId] = useState(null)
+  const [editDraft, setEditDraft] = useState({ name: '', jersey_number: '', position: '' })
   const [name, setName] = useState('')
   const [jersey, setJersey] = useState('')
   const [position, setPosition] = useState('')
@@ -206,25 +218,72 @@ function TeamDetail({ team, onBack }) {
     loadPlayers()
   }
 
+  function startEditPlayer(p) {
+    setEditingPlayerId(p.id)
+    setEditDraft({
+      name: p.name,
+      jersey_number: p.jersey_number ?? '',
+      position: p.position ?? '',
+    })
+  }
+
+  async function saveEditPlayer(id) {
+    await supabase
+      .from('players')
+      .update({
+        name: editDraft.name,
+        jersey_number: editDraft.jersey_number === '' ? null : parseInt(editDraft.jersey_number, 10),
+        position: editDraft.position || null,
+      })
+      .eq('id', id)
+    setEditingPlayerId(null)
+    loadPlayers()
+  }
+
   return (
     <div>
       <button onClick={onBack} className="text-sm text-chalkdim hover:text-chalk mb-4">
         ← All teams
       </button>
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="font-display text-4xl font-bold">{team.name}</h1>
-          <p className="text-chalkdim text-sm mt-1">
-            {[team.league, team.division].filter(Boolean).join(' · ') || 'No league set'}
-          </p>
+
+      {showEditTeam ? (
+        <div className="mb-6">
+          <h1 className="font-display text-2xl font-semibold mb-3 text-chalkdim uppercase tracking-wide text-sm">
+            Edit team
+          </h1>
+          <TeamForm
+            team={team}
+            onCancel={() => setShowEditTeam(false)}
+            onSaved={(updated) => {
+              setShowEditTeam(false)
+              if (updated) onTeamUpdated(updated)
+            }}
+          />
         </div>
-        <button
-          onClick={() => setShowNewPlayer(true)}
-          className="bg-red text-white font-semibold text-sm rounded-md px-4 py-2 hover:bg-red/90"
-        >
-          + Add player
-        </button>
-      </div>
+      ) : (
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="font-display text-4xl font-bold">{team.name}</h1>
+            <p className="text-chalkdim text-sm mt-1">
+              {[team.league, team.division].filter(Boolean).join(' · ') || 'No league set'}
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowEditTeam(true)}
+              className="bg-panel2 border border-line text-chalk font-medium text-sm rounded-md px-4 py-2 hover:border-red"
+            >
+              Edit team
+            </button>
+            <button
+              onClick={() => setShowNewPlayer(true)}
+              className="bg-red text-white font-semibold text-sm rounded-md px-4 py-2 hover:bg-red/90"
+            >
+              + Add player
+            </button>
+          </div>
+        </div>
+      )}
 
       {showNewPlayer && (
         <form
@@ -294,21 +353,69 @@ function TeamDetail({ team, onBack }) {
               </tr>
             </thead>
             <tbody>
-              {players.map((p) => (
-                <tr key={p.id} className="border-b border-line last:border-0">
-                  <td className="px-4 py-3 stat-figure text-chalkdim">{p.jersey_number ?? '—'}</td>
-                  <td className="px-4 py-3 font-medium">{p.name}</td>
-                  <td className="px-4 py-3 text-chalkdim">{p.position ?? '—'}</td>
-                  <td className="px-4 py-3 text-right">
-                    <button
-                      onClick={() => removePlayer(p.id)}
-                      className="text-xs text-chalkdim hover:text-alert"
-                    >
-                      Remove
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {players.map((p) =>
+                editingPlayerId === p.id ? (
+                  <tr key={p.id} className="border-b border-line last:border-0 bg-panel2">
+                    <td className="px-4 py-2">
+                      <input
+                        type="number"
+                        value={editDraft.jersey_number}
+                        onChange={(e) => setEditDraft((d) => ({ ...d, jersey_number: e.target.value }))}
+                        className="w-14 bg-panel border border-line rounded px-2 py-1 stat-figure focus:border-red outline-none"
+                      />
+                    </td>
+                    <td className="px-4 py-2">
+                      <input
+                        value={editDraft.name}
+                        onChange={(e) => setEditDraft((d) => ({ ...d, name: e.target.value }))}
+                        className="w-full bg-panel border border-line rounded px-2 py-1 focus:border-red outline-none"
+                      />
+                    </td>
+                    <td className="px-4 py-2">
+                      <input
+                        value={editDraft.position}
+                        onChange={(e) => setEditDraft((d) => ({ ...d, position: e.target.value }))}
+                        placeholder="G / F / C"
+                        className="w-full bg-panel border border-line rounded px-2 py-1 focus:border-red outline-none"
+                      />
+                    </td>
+                    <td className="px-4 py-2 text-right whitespace-nowrap">
+                      <button
+                        onClick={() => saveEditPlayer(p.id)}
+                        className="text-xs text-red font-medium hover:text-red/80 mr-3"
+                      >
+                        Save
+                      </button>
+                      <button
+                        onClick={() => setEditingPlayerId(null)}
+                        className="text-xs text-chalkdim hover:text-chalk"
+                      >
+                        Cancel
+                      </button>
+                    </td>
+                  </tr>
+                ) : (
+                  <tr key={p.id} className="border-b border-line last:border-0">
+                    <td className="px-4 py-3 stat-figure text-chalkdim">{p.jersey_number ?? '—'}</td>
+                    <td className="px-4 py-3 font-medium">{p.name}</td>
+                    <td className="px-4 py-3 text-chalkdim">{p.position ?? '—'}</td>
+                    <td className="px-4 py-3 text-right whitespace-nowrap">
+                      <button
+                        onClick={() => startEditPlayer(p)}
+                        className="text-xs text-chalkdim hover:text-chalk mr-3"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => removePlayer(p.id)}
+                        className="text-xs text-chalkdim hover:text-alert"
+                      >
+                        Remove
+                      </button>
+                    </td>
+                  </tr>
+                )
+              )}
             </tbody>
           </table>
         </div>

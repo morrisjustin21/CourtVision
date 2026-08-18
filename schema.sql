@@ -25,6 +25,7 @@ create table if not exists players (
 create table if not exists games (
   id uuid primary key default gen_random_uuid(),
   game_date date not null default current_date,
+  season text,
   home_team_id uuid references teams(id) not null,
   away_team_id uuid references teams(id) not null,
   home_score int,
