@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
+import ScoutingReport from './ScoutingReport'
 
 export default function Teams() {
   const [teams, setTeams] = useState([])
@@ -182,6 +183,17 @@ function TeamDetail({ team, onBack, onTeamUpdated }) {
   const [name, setName] = useState('')
   const [jersey, setJersey] = useState('')
   const [position, setPosition] = useState('')
+  const [tab, setTab] = useState('roster')
+  const [notes, setNotes] = useState(team.scouting_notes || '')
+  const [savingNotes, setSavingNotes] = useState(false)
+  const [savedAt, setSavedAt] = useState(null)
+
+  async function saveNotes() {
+    setSavingNotes(true)
+    await supabase.from('teams').update({ scouting_notes: notes }).eq('id', team.id)
+    setSavingNotes(false)
+    setSavedAt(new Date())
+  }
 
   async function loadPlayers() {
     setLoading(true)
@@ -275,16 +287,50 @@ function TeamDetail({ team, onBack, onTeamUpdated }) {
             >
               Edit team
             </button>
-            <button
-              onClick={() => setShowNewPlayer(true)}
-              className="bg-red text-white font-semibold text-sm rounded-md px-4 py-2 hover:bg-red/90"
-            >
-              + Add player
-            </button>
+            {tab === 'roster' && (
+              <button
+                onClick={() => setShowNewPlayer(true)}
+                className="bg-red text-white font-semibold text-sm rounded-md px-4 py-2 hover:bg-red/90"
+              >
+                + Add player
+              </button>
+            )}
           </div>
         </div>
       )}
 
+      {!showEditTeam && (
+        <div className="flex gap-1 bg-panel border border-line rounded-md p-1 mb-6 w-fit">
+          {[
+            { key: 'roster', label: 'Roster' },
+            { key: 'scouting', label: 'Scouting Report' },
+          ].map((t) => (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              className={`text-xs font-medium px-3 py-1.5 rounded ${
+                tab === t.key ? 'bg-red text-white' : 'text-chalkdim hover:text-chalk'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {tab === 'scouting' && !showEditTeam && (
+        <ScoutingReport
+          team={team}
+          notes={notes}
+          setNotes={setNotes}
+          onSaveNotes={saveNotes}
+          savingNotes={savingNotes}
+          savedAt={savedAt}
+        />
+      )}
+
+      {tab === 'roster' && !showEditTeam && (
+        <>
       {showNewPlayer && (
         <form
           onSubmit={addPlayer}
@@ -419,6 +465,8 @@ function TeamDetail({ team, onBack, onTeamUpdated }) {
             </tbody>
           </table>
         </div>
+      )}
+        </>
       )}
     </div>
   )

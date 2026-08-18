@@ -3,6 +3,12 @@ import { supabase } from '../supabaseClient'
 
 const STAT_FIELDS = [
   { key: 'points', label: 'PTS' },
+  { key: 'two_made', label: '2PM' },
+  { key: 'two_att', label: '2PA' },
+  { key: 'three_made', label: '3PM' },
+  { key: 'three_att', label: '3PA' },
+  { key: 'ft_made', label: 'FTM' },
+  { key: 'ft_att', label: 'FTA' },
   { key: 'rebounds', label: 'REB' },
   { key: 'assists', label: 'AST' },
   { key: 'steals', label: 'STL' },
@@ -17,6 +23,12 @@ const STAT_FIELDS = [
 // Maps Hudl's column names to this app's stat fields.
 const HUDL_COLUMN_MAP = {
   Points: 'points',
+  TwoPointsMade: 'two_made',
+  TwoPointAttempts: 'two_att',
+  ThreePointsMade: 'three_made',
+  ThreePointAttempts: 'three_att',
+  FreeThrowsMade: 'ft_made',
+  FreeThrowAttempts: 'ft_att',
   Rebounds: 'rebounds',
   Assists: 'assists',
   Steals: 'steals',
@@ -104,6 +116,12 @@ function parseReportCsv(text) {
   const jerseyIdx = col('#')
   const athleteIdx = col('Athletes')
   const pointsIdx = col('PF')
+  const twoMadeIdx = col('2FGM')
+  const twoAttIdx = col('2FGA')
+  const threeMadeIdx = col('3FGM')
+  const threeAttIdx = col('3FGA')
+  const ftMadeIdx = col('FTM')
+  const ftAttIdx = col('FTA')
   const rebIdx = col('REB')
   const astIdx = col('AST')
   const toIdx = col('TO')
@@ -130,6 +148,12 @@ function parseReportCsv(text) {
       suggestedName,
       stats: {
         points: num(fields[pointsIdx]),
+        two_made: num(fields[twoMadeIdx]),
+        two_att: num(fields[twoAttIdx]),
+        three_made: num(fields[threeMadeIdx]),
+        three_att: num(fields[threeAttIdx]),
+        ft_made: num(fields[ftMadeIdx]),
+        ft_att: num(fields[ftAttIdx]),
         rebounds: num(fields[rebIdx]),
         assists: num(fields[astIdx]),
         turnovers: num(fields[toIdx]),

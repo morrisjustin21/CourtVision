@@ -10,6 +10,7 @@ create table if not exists teams (
   division text,
   color text default '#E31B23',
   is_my_team boolean default false,
+  scouting_notes text,
   created_at timestamptz default now()
 );
 
@@ -39,6 +40,12 @@ create table if not exists player_game_stats (
   game_id uuid references games(id) on delete cascade not null,
   player_id uuid references players(id) on delete cascade not null,
   points int default 0,
+  two_made int default 0,
+  two_att int default 0,
+  three_made int default 0,
+  three_att int default 0,
+  ft_made int default 0,
+  ft_att int default 0,
   rebounds int default 0,
   assists int default 0,
   steals int default 0,
