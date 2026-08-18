@@ -93,6 +93,7 @@ export default function ScoutingReport({ team, notes, setNotes, onSaveNotes, sav
         acc.three_att += r.three_att || 0
         acc.ft_made += r.ft_made || 0
         acc.ft_att += r.ft_att || 0
+        acc.oreb += r.oreb || 0
         acc.rebounds += r.rebounds || 0
         acc.assists += r.assists || 0
         acc.steals += r.steals || 0
@@ -103,12 +104,19 @@ export default function ScoutingReport({ team, notes, setNotes, onSaveNotes, sav
       },
       {
         points: 0, two_made: 0, two_att: 0, three_made: 0, three_att: 0,
-        ft_made: 0, ft_att: 0, rebounds: 0, assists: 0, steals: 0,
+        ft_made: 0, ft_att: 0, oreb: 0, rebounds: 0, assists: 0, steals: 0,
         blocks: 0, turnovers: 0, fouls: 0,
       }
     )
     const per = (n) => (gamesWithStats ? n / gamesWithStats : 0)
     const totalFga = totals.two_att + totals.three_att
+
+    // Dean Oliver's possession estimate: FGA + 0.44*FTA + TOV - OREB.
+    // Offensive rebounds are excluded because they extend the same possession
+    // rather than starting a new one.
+    const possessions = totalFga + 0.44 * totals.ft_att + totals.turnovers - totals.oreb
+    const pace = gamesWithStats ? possessions / gamesWithStats : null
+    const offRating = possessions > 0 ? (totals.points / possessions) * 100 : null
 
     return {
       gamesWithStats,
@@ -124,6 +132,8 @@ export default function ScoutingReport({ team, notes, setNotes, onSaveNotes, sav
       threePct: pct(totals.three_made, totals.three_att),
       ftPct: pct(totals.ft_made, totals.ft_att),
       threeRate: totalFga ? (totals.three_att / totalFga) * 100 : null,
+      pace,
+      offRating,
     }
   }, [statsRows])
 
@@ -249,6 +259,22 @@ export default function ScoutingReport({ team, notes, setNotes, onSaveNotes, sav
           label="3PA Rate"
           value={fmtPct(summary.threeRate)}
           sub="share of shots taken from three"
+        />
+      </div>
+
+      <h3 className="font-display text-xl font-semibold text-chalkdim uppercase tracking-wide text-sm mb-3">
+        Pace & Efficiency
+      </h3>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+        <StatCard
+          label="Pace"
+          value={summary.pace == null ? '—' : summary.pace.toFixed(1)}
+          sub="est. possessions per game"
+        />
+        <StatCard
+          label="Off. Rating"
+          value={summary.offRating == null ? '—' : summary.offRating.toFixed(1)}
+          sub="points per 100 possessions"
         />
       </div>
 
