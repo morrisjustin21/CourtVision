@@ -47,7 +47,21 @@ function LeaderboardCard({ title, players, statKey, suffix }) {
   )
 }
 
-export default function ScoutingReport({ team, notes, setNotes, onSaveNotes, savingNotes, savedAt }) {
+export default function ScoutingReport({
+  team,
+  notes,
+  setNotes,
+  onSaveNotes,
+  savingNotes,
+  savedAt,
+  opponentRoster,
+  myTeamRoster,
+  matchupPlan,
+  setMatchupPlan,
+  onSaveMatchup,
+  savingMatchup,
+  matchupSavedAt,
+}) {
   const [loading, setLoading] = useState(true)
   const [statsRows, setStatsRows] = useState([])
   const [gamesCount, setGamesCount] = useState(0)
@@ -226,6 +240,17 @@ export default function ScoutingReport({ team, notes, setNotes, onSaveNotes, sav
             </p>
           )}
         </div>
+        {!team.is_my_team && (
+          <MatchupSection
+            opponentRoster={opponentRoster}
+            myTeamRoster={myTeamRoster}
+            matchupPlan={matchupPlan}
+            setMatchupPlan={setMatchupPlan}
+            onSave={onSaveMatchup}
+            saving={savingMatchup}
+            savedAt={matchupSavedAt}
+          />
+        )}
         <NotesSection notes={notes} setNotes={setNotes} onSave={onSaveNotes} saving={savingNotes} savedAt={savedAt} />
       </div>
     )
@@ -326,6 +351,18 @@ export default function ScoutingReport({ team, notes, setNotes, onSaveNotes, sav
         <LeaderboardCard title="Steals" players={topSteals} statKey="spg" suffix="SPG" />
       </div>
 
+      {!team.is_my_team && (
+        <MatchupSection
+          opponentRoster={opponentRoster}
+          myTeamRoster={myTeamRoster}
+          matchupPlan={matchupPlan}
+          setMatchupPlan={setMatchupPlan}
+          onSave={onSaveMatchup}
+          saving={savingMatchup}
+          savedAt={matchupSavedAt}
+        />
+      )}
+
       <NotesSection notes={notes} setNotes={setNotes} onSave={onSaveNotes} saving={savingNotes} savedAt={savedAt} />
       </div>
 
@@ -339,7 +376,95 @@ export default function ScoutingReport({ team, notes, setNotes, onSaveNotes, sav
           topAssists={topAssists}
           topSteals={topSteals}
           notes={notes}
+          matchupPlan={matchupPlan}
+          opponentRoster={opponentRoster}
+          myTeamRoster={myTeamRoster}
         />
+      </div>
+    </div>
+  )
+}
+
+function MatchupSection({ opponentRoster, myTeamRoster, matchupPlan, setMatchupPlan, onSave, saving, savedAt }) {
+  function updateSlot(i, field, value) {
+    setMatchupPlan((prev) => prev.map((slot, idx) => (idx === i ? { ...slot, [field]: value } : slot)))
+  }
+
+  return (
+    <div className="mb-6 print:hidden">
+      <h3 className="font-display text-xl font-semibold text-chalkdim uppercase tracking-wide text-sm mb-3">
+        Starting 5 Matchups
+      </h3>
+
+      {myTeamRoster.length === 0 && (
+        <p className="text-xs text-chalkdim mb-3">
+          Mark one of your teams as "My team" (via Edit team) to enable defender assignments.
+        </p>
+      )}
+
+      <div className="bg-panel border border-line rounded-lg overflow-hidden">
+        <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_1.4fr] gap-px bg-line text-xs uppercase tracking-wide text-chalkdim">
+          <div className="bg-panel px-3 py-2 hidden sm:block">Their starter</div>
+          <div className="bg-panel px-3 py-2 hidden sm:block">Guarded by</div>
+          <div className="bg-panel px-3 py-2 hidden sm:block">Matchup notes</div>
+        </div>
+        {matchupPlan.map((slot, i) => (
+          <div
+            key={i}
+            className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_1.4fr] gap-2 sm:gap-px bg-line sm:bg-line"
+          >
+            <div className="bg-panel px-3 py-2">
+              <select
+                value={slot.opponentPlayerId}
+                onChange={(e) => updateSlot(i, 'opponentPlayerId', e.target.value)}
+                className="w-full bg-panel2 border border-line rounded-md px-2 py-1.5 text-sm focus:border-red outline-none"
+              >
+                <option value="">— Select player —</option>
+                {opponentRoster.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.jersey_number != null ? `#${p.jersey_number} ` : ''}{p.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="bg-panel px-3 py-2">
+              <select
+                value={slot.defenderPlayerId}
+                onChange={(e) => updateSlot(i, 'defenderPlayerId', e.target.value)}
+                disabled={myTeamRoster.length === 0}
+                className="w-full bg-panel2 border border-line rounded-md px-2 py-1.5 text-sm focus:border-red outline-none disabled:opacity-50"
+              >
+                <option value="">— Select defender —</option>
+                {myTeamRoster.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.jersey_number != null ? `#${p.jersey_number} ` : ''}{p.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="bg-panel px-3 py-2">
+              <input
+                value={slot.notes}
+                onChange={(e) => updateSlot(i, 'notes', e.target.value)}
+                placeholder="e.g. shades left, closes out hard on 3s"
+                className="w-full bg-panel2 border border-line rounded-md px-2 py-1.5 text-sm focus:border-red outline-none"
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex items-center gap-3 mt-2">
+        <button
+          onClick={onSave}
+          disabled={saving}
+          className="bg-red text-white font-semibold text-sm rounded-md px-4 py-2 hover:bg-red/90 disabled:opacity-60"
+        >
+          {saving ? 'Saving…' : 'Save matchups'}
+        </button>
+        {savedAt && !saving && (
+          <span className="text-xs text-chalkdim">Saved {savedAt.toLocaleTimeString()}</span>
+        )}
       </div>
     </div>
   )
@@ -354,12 +479,23 @@ function PrintableReport({
   topAssists,
   topSteals,
   notes,
+  matchupPlan,
+  opponentRoster,
+  myTeamRoster,
 }) {
   const today = new Date().toLocaleDateString(undefined, {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
   })
+
+  function playerLabel(roster, id) {
+    const p = roster.find((r) => r.id === id)
+    if (!p) return null
+    return `${p.jersey_number != null ? `#${p.jersey_number} ` : ''}${p.name}`
+  }
+
+  const activeMatchups = (matchupPlan || []).filter((s) => s.opponentPlayerId || s.defenderPlayerId || s.notes)
 
   const row = (label, value) => (
     <div className="flex justify-between border-b border-gray-200 py-1">
@@ -436,6 +572,36 @@ function PrintableReport({
           <PrintLeaderList title="Steals" players={topSteals} statKey="spg" suffix="SPG" />
         </div>
       </div>
+
+      {activeMatchups.length > 0 && (
+        <div className="mb-4">
+          <p className="text-[10px] uppercase tracking-wide text-gray-500 font-semibold mb-1.5">
+            Starting 5 Matchups
+          </p>
+          <table className="w-full text-[11px] border-collapse">
+            <thead>
+              <tr className="text-left text-gray-500 border-b border-gray-300">
+                <th className="font-semibold py-1 pr-2">Their starter</th>
+                <th className="font-semibold py-1 pr-2">Guarded by</th>
+                <th className="font-semibold py-1">Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {activeMatchups.map((slot, i) => (
+                <tr key={i} className="border-b border-gray-200">
+                  <td className="py-1 pr-2 text-black">
+                    {playerLabel(opponentRoster, slot.opponentPlayerId) || '—'}
+                  </td>
+                  <td className="py-1 pr-2 text-black">
+                    {playerLabel(myTeamRoster, slot.defenderPlayerId) || '—'}
+                  </td>
+                  <td className="py-1 text-gray-700">{slot.notes || ''}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {notes && (
         <div>
