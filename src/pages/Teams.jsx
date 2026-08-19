@@ -254,7 +254,7 @@ function TeamDetail({ team, onBack, onTeamUpdated }) {
 
   return (
     <div>
-      <button onClick={onBack} className="text-sm text-chalkdim hover:text-chalk mb-4">
+      <button onClick={onBack} className="text-sm text-chalkdim hover:text-chalk mb-4 print:hidden">
         ← All teams
       </button>
 
@@ -273,7 +273,7 @@ function TeamDetail({ team, onBack, onTeamUpdated }) {
           />
         </div>
       ) : (
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-6 print:hidden">
           <div>
             <h1 className="font-display text-4xl font-bold">{team.name}</h1>
             <p className="text-chalkdim text-sm mt-1">
@@ -300,7 +300,7 @@ function TeamDetail({ team, onBack, onTeamUpdated }) {
       )}
 
       {!showEditTeam && (
-        <div className="flex gap-1 bg-panel border border-line rounded-md p-1 mb-6 w-fit">
+        <div className="flex gap-1 bg-panel border border-line rounded-md p-1 mb-6 w-fit print:hidden">
           {[
             { key: 'roster', label: 'Roster' },
             { key: 'scouting', label: 'Scouting Report' },
