@@ -10,6 +10,17 @@ function fmtPct(v) {
   return v == null ? '—' : `${v.toFixed(1)}%`
 }
 
+// Some imports leave a placeholder name (e.g. an unmatched jersey the user
+// never renamed). In that case show just the jersey number, never the
+// placeholder text itself.
+function displayName(name, jerseyNumber) {
+  const isPlaceholder = (name || '').trim().toLowerCase() === 'unknown athlete'
+  if (isPlaceholder) {
+    return jerseyNumber != null ? `#${jerseyNumber}` : '—'
+  }
+  return `${jerseyNumber != null ? `#${jerseyNumber} ` : ''}${name}`
+}
+
 function StatCard({ label, value, sub }) {
   return (
     <div className="bg-panel border border-line rounded-lg p-4">
@@ -31,10 +42,7 @@ function LeaderboardCard({ title, players, statKey, suffix }) {
             <tr key={p.id} className="border-b border-line last:border-0">
               <td className="pl-4 pr-2 py-2 stat-figure text-chalkdim text-xs w-6">{i + 1}</td>
               <td className="px-2 py-2 font-medium whitespace-nowrap">
-                {p.jersey_number != null && (
-                  <span className="text-chalkdim stat-figure mr-1.5">#{p.jersey_number}</span>
-                )}
-                {p.name}
+                {displayName(p.name, p.jersey_number)}
               </td>
               <td className="px-4 py-2 text-right stat-figure text-red font-semibold whitespace-nowrap">
                 {p[statKey].toFixed(1)} {suffix}
@@ -51,6 +59,12 @@ export default function ScoutingReport({
   team,
   notes,
   setNotes,
+  offenseNotes,
+  setOffenseNotes,
+  defenseNotes,
+  setDefenseNotes,
+  keysToVictory,
+  setKeysToVictory,
   onSaveNotes,
   savingNotes,
   savedAt,
@@ -287,7 +301,19 @@ export default function ScoutingReport({
             savedAt={matchupSavedAt}
           />
         )}
-        <NotesSection notes={notes} setNotes={setNotes} onSave={onSaveNotes} saving={savingNotes} savedAt={savedAt} />
+        <GamePlanSection
+          offenseNotes={offenseNotes}
+          setOffenseNotes={setOffenseNotes}
+          defenseNotes={defenseNotes}
+          setDefenseNotes={setDefenseNotes}
+          keysToVictory={keysToVictory}
+          setKeysToVictory={setKeysToVictory}
+          notes={notes}
+          setNotes={setNotes}
+          onSave={onSaveNotes}
+          saving={savingNotes}
+          savedAt={savedAt}
+        />
       </div>
     )
   }
@@ -381,10 +407,7 @@ export default function ScoutingReport({
                   {i + 1}
                 </span>
                 <p className="font-medium mb-0.5">
-                  {p.jersey_number != null && (
-                    <span className="text-chalkdim stat-figure mr-1.5">#{p.jersey_number}</span>
-                  )}
-                  {p.name}
+                  {displayName(p.name, p.jersey_number)}
                 </p>
                 <p className="text-xs text-chalkdim mb-3">{p.games} GP</p>
                 <p className="text-xs text-chalkdim">
@@ -420,7 +443,19 @@ export default function ScoutingReport({
         />
       )}
 
-      <NotesSection notes={notes} setNotes={setNotes} onSave={onSaveNotes} saving={savingNotes} savedAt={savedAt} />
+      <GamePlanSection
+          offenseNotes={offenseNotes}
+          setOffenseNotes={setOffenseNotes}
+          defenseNotes={defenseNotes}
+          setDefenseNotes={setDefenseNotes}
+          keysToVictory={keysToVictory}
+          setKeysToVictory={setKeysToVictory}
+          notes={notes}
+          setNotes={setNotes}
+          onSave={onSaveNotes}
+          saving={savingNotes}
+          savedAt={savedAt}
+        />
       </div>
 
       <div className="hidden print:block">
@@ -433,6 +468,9 @@ export default function ScoutingReport({
           topAssists={topAssists}
           topSteals={topSteals}
           notes={notes}
+          offenseNotes={offenseNotes}
+          defenseNotes={defenseNotes}
+          keysToVictory={keysToVictory}
           matchupPlan={matchupPlan}
           opponentRoster={opponentRoster}
           myTeamRoster={myTeamRoster}
@@ -479,7 +517,7 @@ function MatchupSection({ opponentRoster, myTeamRoster, matchupPlan, setMatchupP
                 <option value="">— Select player —</option>
                 {opponentRoster.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.jersey_number != null ? `#${p.jersey_number} ` : ''}{p.name}
+                    {displayName(p.name, p.jersey_number)}
                   </option>
                 ))}
               </select>
@@ -494,7 +532,7 @@ function MatchupSection({ opponentRoster, myTeamRoster, matchupPlan, setMatchupP
                 <option value="">— Select defender —</option>
                 {myTeamRoster.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.jersey_number != null ? `#${p.jersey_number} ` : ''}{p.name}
+                    {displayName(p.name, p.jersey_number)}
                   </option>
                 ))}
               </select>
@@ -536,6 +574,9 @@ function PrintableReport({
   topAssists,
   topSteals,
   notes,
+  offenseNotes,
+  defenseNotes,
+  keysToVictory,
   matchupPlan,
   opponentRoster,
   myTeamRoster,
@@ -549,7 +590,7 @@ function PrintableReport({
   function playerLabel(roster, id) {
     const p = roster.find((r) => r.id === id)
     if (!p) return null
-    return `${p.jersey_number != null ? `#${p.jersey_number} ` : ''}${p.name}`
+    return displayName(p.name, p.jersey_number)
   }
 
   const activeMatchups = (matchupPlan || []).filter((s) => s.opponentPlayerId || s.defenderPlayerId || s.notes)
@@ -600,6 +641,15 @@ function PrintableReport({
         <div>{row('Net Rating', summary.netRating == null ? '—' : (summary.netRating > 0 ? '+' : '') + summary.netRating.toFixed(1))}</div>
       </div>
 
+      {keysToVictory && (
+        <div className="mb-4 border-2 border-red rounded px-3 py-2">
+          <p className="text-[10px] uppercase tracking-wide text-red font-bold mb-1">
+            Keys to Victory
+          </p>
+          <p className="text-xs text-black whitespace-pre-wrap leading-snug">{keysToVictory}</p>
+        </div>
+      )}
+
       {top3Players.length > 0 && (
         <div className="mb-4">
           <p className="text-[10px] uppercase tracking-wide text-gray-500 font-semibold mb-1.5">
@@ -609,7 +659,7 @@ function PrintableReport({
             {top3Players.map((p, i) => (
               <div key={p.id} className="border border-gray-300 rounded px-2.5 py-2">
                 <p className="font-semibold text-black text-xs">
-                  {i + 1}. {p.jersey_number != null && `#${p.jersey_number} `}{p.name}
+                  {i + 1}. {displayName(p.name, p.jersey_number)}
                 </p>
                 <p className="text-[11px] text-gray-600">
                   {p.ppg.toFixed(1)} PPG · {p.rpg.toFixed(1)} RPG · {p.apg.toFixed(1)} APG
@@ -662,10 +712,31 @@ function PrintableReport({
         </div>
       )}
 
+      {(offenseNotes || defenseNotes) && (
+        <div className="grid grid-cols-2 gap-4 mb-4">
+          {offenseNotes && (
+            <div>
+              <p className="text-[10px] uppercase tracking-wide text-gray-500 font-semibold mb-1.5">
+                Their Offense
+              </p>
+              <p className="text-xs text-black whitespace-pre-wrap leading-snug">{offenseNotes}</p>
+            </div>
+          )}
+          {defenseNotes && (
+            <div>
+              <p className="text-[10px] uppercase tracking-wide text-gray-500 font-semibold mb-1.5">
+                Their Defense
+              </p>
+              <p className="text-xs text-black whitespace-pre-wrap leading-snug">{defenseNotes}</p>
+            </div>
+          )}
+        </div>
+      )}
+
       {notes && (
         <div>
           <p className="text-[10px] uppercase tracking-wide text-gray-500 font-semibold mb-1.5">
-            Game plan notes
+            Additional Notes
           </p>
           <p className="text-xs text-black whitespace-pre-wrap leading-snug">{notes}</p>
         </div>
@@ -681,27 +752,82 @@ function PrintLeaderList({ title, players, statKey, suffix }) {
       <p className="font-semibold text-black mb-0.5">{title}</p>
       {players.slice(0, 3).map((p) => (
         <p key={p.id} className="text-gray-700">
-          {p.name} — {p[statKey].toFixed(1)} {suffix}
+          {displayName(p.name, p.jersey_number)} — {p[statKey].toFixed(1)} {suffix}
         </p>
       ))}
     </div>
   )
 }
 
-function NotesSection({ notes, setNotes, onSave, saving, savedAt }) {
+function GamePlanSection({
+  offenseNotes,
+  setOffenseNotes,
+  defenseNotes,
+  setDefenseNotes,
+  keysToVictory,
+  setKeysToVictory,
+  notes,
+  setNotes,
+  onSave,
+  saving,
+  savedAt,
+}) {
   return (
-    <div>
-      <h3 className="font-display text-xl font-semibold text-chalkdim uppercase tracking-wide text-sm mb-3">
-        Game plan notes
-      </h3>
-      <textarea
-        value={notes}
-        onChange={(e) => setNotes(e.target.value)}
-        rows={8}
-        placeholder="Defensive keys, matchup notes, plays to watch for, inbound tendencies…"
-        className="w-full bg-panel2 border border-line rounded-md px-3 py-2.5 text-sm focus:border-red outline-none resize-y"
-      />
-      <div className="flex items-center gap-3 mt-2">
+    <div className="space-y-6">
+      <div>
+        <h3 className="font-display text-xl font-semibold text-chalkdim uppercase tracking-wide text-sm mb-3">
+          Keys to Victory
+        </h3>
+        <textarea
+          value={keysToVictory}
+          onChange={(e) => setKeysToVictory(e.target.value)}
+          rows={4}
+          placeholder="e.g. Win the rebounding battle, limit transition points, attack #23 on defense…"
+          className="w-full bg-panel2 border border-red/40 rounded-md px-3 py-2.5 text-sm focus:border-red outline-none resize-y"
+        />
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <h3 className="font-display text-xl font-semibold text-chalkdim uppercase tracking-wide text-sm mb-3">
+            Their Offense
+          </h3>
+          <textarea
+            value={offenseNotes}
+            onChange={(e) => setOffenseNotes(e.target.value)}
+            rows={6}
+            placeholder="Sets they run, who they go to in crunch time, shooters to key on…"
+            className="w-full bg-panel2 border border-line rounded-md px-3 py-2.5 text-sm focus:border-red outline-none resize-y"
+          />
+        </div>
+        <div>
+          <h3 className="font-display text-xl font-semibold text-chalkdim uppercase tracking-wide text-sm mb-3">
+            Their Defense
+          </h3>
+          <textarea
+            value={defenseNotes}
+            onChange={(e) => setDefenseNotes(e.target.value)}
+            rows={6}
+            placeholder="Man or zone, press tendencies, how they defend ball screens…"
+            className="w-full bg-panel2 border border-line rounded-md px-3 py-2.5 text-sm focus:border-red outline-none resize-y"
+          />
+        </div>
+      </div>
+
+      <div>
+        <h3 className="font-display text-xl font-semibold text-chalkdim uppercase tracking-wide text-sm mb-3">
+          Additional Notes
+        </h3>
+        <textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          rows={6}
+          placeholder="Anything else — inbound tendencies, officiating notes, travel logistics…"
+          className="w-full bg-panel2 border border-line rounded-md px-3 py-2.5 text-sm focus:border-red outline-none resize-y"
+        />
+      </div>
+
+      <div className="flex items-center gap-3">
         <button
           onClick={onSave}
           disabled={saving}
