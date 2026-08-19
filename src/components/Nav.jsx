@@ -8,7 +8,7 @@ const LINKS = [
 
 export default function Nav({ view, setView }) {
   return (
-    <div className="w-full md:w-56 shrink-0 border-b md:border-b-0 md:border-r border-line bg-panel">
+    <div className="w-full md:w-56 shrink-0 border-b md:border-b-0 md:border-r border-line bg-panel print:hidden">
       <div className="px-5 py-5 flex items-center gap-2">
         <svg width="18" height="18" viewBox="0 0 18 18" className="text-red shrink-0">
           <circle cx="9" cy="9" r="6.5" stroke="currentColor" strokeWidth="1.4" fill="none" />
