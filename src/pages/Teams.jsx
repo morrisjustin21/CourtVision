@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import ScoutingReport from './ScoutingReport'
+import PlayerDevelopment from './PlayerDevelopment'
 
 const MATCHUP_SLOTS = 5
 
@@ -210,6 +211,29 @@ function TeamDetail({ team, onBack, onTeamUpdated }) {
   const [savingMatchup, setSavingMatchup] = useState(false)
   const [matchupSavedAt, setMatchupSavedAt] = useState(null)
   const [myTeamRoster, setMyTeamRoster] = useState([])
+  const [selectedPlayer, setSelectedPlayer] = useState(null)
+  const [record, setRecord] = useState(null)
+
+  useEffect(() => {
+    async function loadRecord() {
+      const { data } = await supabase
+        .from('games')
+        .select('home_team_id, away_team_id, home_score, away_score')
+        .or(`home_team_id.eq.${team.id},away_team_id.eq.${team.id}`)
+      let wins = 0
+      let losses = 0
+      ;(data || []).forEach((g) => {
+        const isHome = g.home_team_id === team.id
+        const us = isHome ? g.home_score : g.away_score
+        const them = isHome ? g.away_score : g.home_score
+        if (us == null || them == null) return
+        if (us > them) wins += 1
+        else if (them > us) losses += 1
+      })
+      setRecord({ wins, losses })
+    }
+    loadRecord()
+  }, [team.id])
 
   async function saveNotes() {
     setSavingNotes(true)
@@ -313,6 +337,20 @@ function TeamDetail({ team, onBack, onTeamUpdated }) {
     loadPlayers()
   }
 
+  if (selectedPlayer) {
+    return (
+      <PlayerDevelopment
+        player={selectedPlayer}
+        team={team}
+        onBack={() => setSelectedPlayer(null)}
+        onPlayerUpdated={(updated) => {
+          setSelectedPlayer(updated)
+          setPlayers((prev) => prev.map((p) => (p.id === updated.id ? updated : p)))
+        }}
+      />
+    )
+  }
+
   return (
     <div>
       <button onClick={onBack} className="text-sm text-chalkdim hover:text-chalk mb-4 print:hidden">
@@ -336,7 +374,14 @@ function TeamDetail({ team, onBack, onTeamUpdated }) {
       ) : (
         <div className="flex items-center justify-between mb-6 print:hidden">
           <div>
-            <h1 className="font-display text-4xl font-bold">{team.name}</h1>
+            <div className="flex items-center gap-3">
+              <h1 className="font-display text-4xl font-bold">{team.name}</h1>
+              {record && (record.wins > 0 || record.losses > 0) && (
+                <span className="text-sm font-semibold stat-figure text-chalkdim border border-line rounded-full px-3 py-1">
+                  {record.wins}-{record.losses}
+                </span>
+              )}
+            </div>
             <p className="text-chalkdim text-sm mt-1">
               {[team.league, team.division].filter(Boolean).join(' · ') || 'No league set'}
             </p>
@@ -517,9 +562,22 @@ function TeamDetail({ team, onBack, onTeamUpdated }) {
                 ) : (
                   <tr key={p.id} className="border-b border-line last:border-0">
                     <td className="px-4 py-3 stat-figure text-chalkdim">{p.jersey_number ?? '—'}</td>
-                    <td className="px-4 py-3 font-medium">{p.name}</td>
+                    <td className="px-4 py-3 font-medium">
+                      <button
+                        onClick={() => setSelectedPlayer(p)}
+                        className="hover:text-red text-left"
+                      >
+                        {p.name}
+                      </button>
+                    </td>
                     <td className="px-4 py-3 text-chalkdim">{p.position ?? '—'}</td>
                     <td className="px-4 py-3 text-right whitespace-nowrap">
+                      <button
+                        onClick={() => setSelectedPlayer(p)}
+                        className="text-xs text-chalkdim hover:text-red mr-3"
+                      >
+                        Dev Report
+                      </button>
                       <button
                         onClick={() => startEditPlayer(p)}
                         className="text-xs text-chalkdim hover:text-chalk mr-3"
