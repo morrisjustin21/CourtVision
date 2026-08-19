@@ -64,14 +64,14 @@ export default function ScoutingReport({
 }) {
   const [loading, setLoading] = useState(true)
   const [statsRows, setStatsRows] = useState([])
-  const [gamesCount, setGamesCount] = useState(0)
+  const [teamGames, setTeamGames] = useState([])
 
   useEffect(() => {
     async function load() {
       setLoading(true)
-      const { data: teamGames } = await supabase
+      const { data: teamGamesData } = await supabase
         .from('games')
-        .select('id')
+        .select('id, home_team_id, away_team_id, home_score, away_score')
         .or(`home_team_id.eq.${team.id},away_team_id.eq.${team.id}`)
 
       const { data: players } = await supabase
@@ -89,7 +89,7 @@ export default function ScoutingReport({
         stats = data || []
       }
 
-      setGamesCount((teamGames || []).length)
+      setTeamGames(teamGamesData || [])
       setStatsRows(stats)
       setLoading(false)
     }
@@ -132,6 +132,39 @@ export default function ScoutingReport({
     const pace = gamesWithStats ? possessions / gamesWithStats : null
     const offRating = possessions > 0 ? (totals.points / possessions) * 100 : null
 
+    // Defensive rating needs "points allowed" (the opponent's final score)
+    // paired with a possession estimate from the same games, so we only use
+    // games where both a final score was recorded AND stats were entered —
+    // otherwise the two halves of the ratio would come from different game
+    // samples and the number would be misleading.
+    const gamesWithStatsSet = new Set(statsRows.map((r) => r.game_id))
+    const pointsAllowedByGame = {}
+    teamGames.forEach((g) => {
+      const isHome = g.home_team_id === team.id
+      const oppScore = isHome ? g.away_score : g.home_score
+      if (oppScore != null && gamesWithStatsSet.has(g.id)) {
+        pointsAllowedByGame[g.id] = oppScore
+      }
+    })
+    const defGameIds = new Set(Object.keys(pointsAllowedByGame))
+    const gamesForDef = defGameIds.size
+    const totalPointsAllowed = Object.values(pointsAllowedByGame).reduce((a, b) => a + b, 0)
+    const defTotals = statsRows
+      .filter((r) => defGameIds.has(r.game_id))
+      .reduce(
+        (acc, r) => {
+          acc.fga += (r.two_att || 0) + (r.three_att || 0)
+          acc.fta += r.ft_att || 0
+          acc.tov += r.turnovers || 0
+          acc.oreb += r.oreb || 0
+          return acc
+        },
+        { fga: 0, fta: 0, tov: 0, oreb: 0 }
+      )
+    const defPossessions = defTotals.fga + 0.44 * defTotals.fta + defTotals.tov - defTotals.oreb
+    const defRating = gamesForDef > 0 && defPossessions > 0 ? (totalPointsAllowed / defPossessions) * 100 : null
+    const netRating = offRating != null && defRating != null ? offRating - defRating : null
+
     return {
       gamesWithStats,
       ppg: per(totals.points),
@@ -148,8 +181,11 @@ export default function ScoutingReport({
       threeRate: totalFga ? (totals.three_att / totalFga) * 100 : null,
       pace,
       offRating,
+      defRating,
+      netRating,
+      gamesForDef,
     }
-  }, [statsRows])
+  }, [statsRows, teamGames, team.id])
 
   const playerAgg = useMemo(() => {
     const byPlayer = {}
@@ -234,9 +270,9 @@ export default function ScoutingReport({
         <div className="border border-dashed border-line rounded-lg p-10 text-center text-chalkdim mb-6">
           No box scores logged for {team.name} yet. Once you enter stats for a game involving this
           team, tendencies and shooting splits will show up here automatically.
-          {gamesCount > 0 && (
+          {teamGames.length > 0 && (
             <p className="mt-2 text-xs">
-              ({gamesCount} game{gamesCount === 1 ? '' : 's'} logged, but no stats entered yet.)
+              ({teamGames.length} game{teamGames.length === 1 ? '' : 's'} logged, but no stats entered yet.)
             </p>
           )}
         </div>
@@ -299,7 +335,7 @@ export default function ScoutingReport({
       <h3 className="font-display text-xl font-semibold text-chalkdim uppercase tracking-wide text-sm mb-3">
         Pace & Efficiency
       </h3>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-1">
         <StatCard
           label="Pace"
           value={summary.pace == null ? '—' : summary.pace.toFixed(1)}
@@ -308,9 +344,30 @@ export default function ScoutingReport({
         <StatCard
           label="Off. Rating"
           value={summary.offRating == null ? '—' : summary.offRating.toFixed(1)}
-          sub="points per 100 possessions"
+          sub="points scored per 100 poss."
+        />
+        <StatCard
+          label="Def. Rating"
+          value={summary.defRating == null ? '—' : summary.defRating.toFixed(1)}
+          sub="points allowed per 100 poss."
+        />
+        <StatCard
+          label="Net Rating"
+          value={summary.netRating == null ? '—' : (summary.netRating > 0 ? '+' : '') + summary.netRating.toFixed(1)}
+          sub="off. rating minus def. rating"
         />
       </div>
+      {summary.defRating != null && summary.gamesForDef < summary.gamesWithStats && (
+        <p className="text-xs text-chalkdim mb-6">
+          Def./Net rating based on {summary.gamesForDef} game{summary.gamesForDef === 1 ? '' : 's'} with a
+          final score recorded — the rest of this section uses all {summary.gamesWithStats}.
+        </p>
+      )}
+      {summary.defRating == null && (
+        <p className="text-xs text-chalkdim mb-6">
+          Def./Net rating needs at least one game with both a final score and stats entered.
+        </p>
+      )}
 
       {top3Players.length > 0 && (
         <>
@@ -539,6 +596,8 @@ function PrintableReport({
       <div className="grid grid-cols-4 gap-x-4 mb-4">
         <div>{row('Pace', summary.pace == null ? '—' : summary.pace.toFixed(1))}</div>
         <div>{row('Off. Rating', summary.offRating == null ? '—' : summary.offRating.toFixed(1))}</div>
+        <div>{row('Def. Rating', summary.defRating == null ? '—' : summary.defRating.toFixed(1))}</div>
+        <div>{row('Net Rating', summary.netRating == null ? '—' : (summary.netRating > 0 ? '+' : '') + summary.netRating.toFixed(1))}</div>
       </div>
 
       {top3Players.length > 0 && (
