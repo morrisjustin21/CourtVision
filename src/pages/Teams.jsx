@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import ScoutingReport from './ScoutingReport'
 import PlayerDevelopment from './PlayerDevelopment'
+import AdditionalStats from './AdditionalStats'
 
 const MATCHUP_SLOTS = 5
 
@@ -410,6 +411,7 @@ function TeamDetail({ team, onBack, onTeamUpdated }) {
           {[
             { key: 'roster', label: 'Roster' },
             { key: 'scouting', label: 'Scouting Report' },
+            { key: 'additional', label: 'Additional Stats' },
           ].map((t) => (
             <button
               key={t.key}
@@ -447,6 +449,8 @@ function TeamDetail({ team, onBack, onTeamUpdated }) {
           matchupSavedAt={matchupSavedAt}
         />
       )}
+
+      {tab === 'additional' && !showEditTeam && <AdditionalStats team={team} />}
 
       {tab === 'roster' && !showEditTeam && (
         <>
