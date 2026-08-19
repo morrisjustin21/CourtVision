@@ -27,3 +27,18 @@ select:focus-visible {
   outline: 2px solid #E8871E;
   outline-offset: 2px;
 }
+
+/* Printing: the app is dark-themed, but printed pages should be normal
+   black-on-white paper, not a dark background wasting ink. Individual
+   printable layouts (see PrintableReport) use explicit black/gray text
+   so they stay legible once this override kicks in. */
+@media print {
+  @page {
+    size: letter;
+    margin: 0.5in;
+  }
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+}
