@@ -201,6 +201,9 @@ function TeamDetail({ team, onBack, onTeamUpdated }) {
   const [position, setPosition] = useState('')
   const [tab, setTab] = useState('roster')
   const [notes, setNotes] = useState(team.scouting_notes || '')
+  const [offenseNotes, setOffenseNotes] = useState(team.offense_notes || '')
+  const [defenseNotes, setDefenseNotes] = useState(team.defense_notes || '')
+  const [keysToVictory, setKeysToVictory] = useState(team.keys_to_victory || '')
   const [savingNotes, setSavingNotes] = useState(false)
   const [savedAt, setSavedAt] = useState(null)
   const [matchupPlan, setMatchupPlan] = useState(normalizeMatchupPlan(team.matchup_plan))
@@ -210,7 +213,15 @@ function TeamDetail({ team, onBack, onTeamUpdated }) {
 
   async function saveNotes() {
     setSavingNotes(true)
-    await supabase.from('teams').update({ scouting_notes: notes }).eq('id', team.id)
+    await supabase
+      .from('teams')
+      .update({
+        scouting_notes: notes,
+        offense_notes: offenseNotes,
+        defense_notes: defenseNotes,
+        keys_to_victory: keysToVictory,
+      })
+      .eq('id', team.id)
     setSavingNotes(false)
     setSavedAt(new Date())
   }
@@ -373,6 +384,12 @@ function TeamDetail({ team, onBack, onTeamUpdated }) {
           team={team}
           notes={notes}
           setNotes={setNotes}
+          offenseNotes={offenseNotes}
+          setOffenseNotes={setOffenseNotes}
+          defenseNotes={defenseNotes}
+          setDefenseNotes={setDefenseNotes}
+          keysToVictory={keysToVictory}
+          setKeysToVictory={setKeysToVictory}
           onSaveNotes={saveNotes}
           savingNotes={savingNotes}
           savedAt={savedAt}
@@ -528,4 +545,3 @@ function TeamDetail({ team, onBack, onTeamUpdated }) {
     </div>
   )
 }
-
