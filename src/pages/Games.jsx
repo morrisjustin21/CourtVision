@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
-import { parseShotChartPdf } from '../shotChartParser'
 
 const STAT_FIELDS = [
   { key: 'points', label: 'PTS' },
@@ -743,46 +742,6 @@ function GameDetail({ game: initialGame, onBack }) {
     setClearing((p) => ({ ...p, [side]: false }))
   }
 
-  const [shotChartImporting, setShotChartImporting] = useState({})
-  const [shotChartError, setShotChartError] = useState({})
-  const [shotChartUnmatched, setShotChartUnmatched] = useState({})
-  const [shotChartSaved, setShotChartSaved] = useState({})
-
-  async function handleShotChartImport(file, side, roster) {
-    setShotChartImporting((p) => ({ ...p, [side]: true }))
-    setShotChartError((p) => ({ ...p, [side]: null }))
-    setShotChartUnmatched((p) => ({ ...p, [side]: [] }))
-    setShotChartSaved((p) => ({ ...p, [side]: false }))
-    try {
-      const players = await parseShotChartPdf(file)
-      const unmatchedJerseys = []
-      for (const p of players) {
-        const player = roster.find((r) => r.jersey_number === p.jersey)
-        if (!player) {
-          if (p.jersey != null) unmatchedJerseys.push(p.jersey)
-          continue
-        }
-        for (const z of p.zones) {
-          await supabase.from('player_shot_zones').upsert(
-            {
-              game_id: game.id,
-              player_id: player.id,
-              zone: z.zoneId,
-              made: z.made,
-              attempted: z.attempted,
-            },
-            { onConflict: 'game_id,player_id,zone' }
-          )
-        }
-      }
-      setShotChartUnmatched((p) => ({ ...p, [side]: unmatchedJerseys }))
-      setShotChartSaved((p) => ({ ...p, [side]: true }))
-    } catch (err) {
-      setShotChartError((p) => ({ ...p, [side]: "Couldn't read that shot chart PDF." }))
-    }
-    setShotChartImporting((p) => ({ ...p, [side]: false }))
-  }
-
   return (
     <div>
       <button onClick={onBack} className="text-sm text-chalkdim hover:text-chalk mb-4">
@@ -860,11 +819,6 @@ function GameDetail({ game: initialGame, onBack }) {
             importError={importError}
             onClearStats={() => clearStatsForSide('away', awayRoster, game.away_team?.name)}
             clearing={clearing}
-            onImportShotChart={(file) => handleShotChartImport(file, 'away', awayRoster)}
-            shotChartImporting={shotChartImporting}
-            shotChartError={shotChartError}
-            shotChartUnmatched={shotChartUnmatched}
-            shotChartSaved={shotChartSaved}
           />
           <RosterTable
             roster={homeRoster}
@@ -885,11 +839,6 @@ function GameDetail({ game: initialGame, onBack }) {
             importError={importError}
             onClearStats={() => clearStatsForSide('home', homeRoster, game.home_team?.name)}
             clearing={clearing}
-            onImportShotChart={(file) => handleShotChartImport(file, 'home', homeRoster)}
-            shotChartImporting={shotChartImporting}
-            shotChartError={shotChartError}
-            shotChartUnmatched={shotChartUnmatched}
-            shotChartSaved={shotChartSaved}
           />
         </>
       )}
@@ -916,18 +865,11 @@ function RosterTable({
   importError,
   onClearStats,
   clearing,
-  onImportShotChart,
-  shotChartImporting,
-  shotChartError,
-  shotChartUnmatched,
-  shotChartSaved,
 }) {
   const fileInputId = `box-score-import-${side}`
-  const shotChartInputId = `shot-chart-import-${side}`
   const unmatchedRows = unmatched[side] || []
   const error = importError?.[side]
   const hasAnyStats = roster.some((p) => statsByPlayer[p.id])
-  const shotChartUnmatchedJerseys = shotChartUnmatched?.[side] || []
 
   return (
     <div className="mb-8">
@@ -951,24 +893,7 @@ function RosterTable({
           >
             {importing[side] ? 'Importing…' : 'Import box score file'}
           </label>
-          <label
-            htmlFor={shotChartInputId}
-            className="text-xs bg-panel2 border border-line hover:border-red text-chalk rounded-md px-3 py-1.5 cursor-pointer"
-          >
-            {shotChartImporting?.[side] ? 'Importing…' : 'Import shot chart PDF'}
-          </label>
         </div>
-        <input
-          id={shotChartInputId}
-          type="file"
-          accept=".pdf,application/pdf"
-          className="hidden"
-          onChange={(e) => {
-            const file = e.target.files?.[0]
-            if (file) onImportShotChart(file)
-            e.target.value = ''
-          }}
-        />
         <input
           id={fileInputId}
           type="file"
@@ -984,23 +909,6 @@ function RosterTable({
 
       {error && (
         <p className="text-alert text-xs mb-3">{error}</p>
-      )}
-
-      {shotChartError?.[side] && (
-        <p className="text-alert text-xs mb-3">{shotChartError[side]}</p>
-      )}
-
-      {shotChartSaved?.[side] && !shotChartImporting?.[side] && (
-        <p className="text-chalkdim text-xs mb-3">
-          Shot chart imported.
-          {shotChartUnmatchedJerseys.length > 0 && (
-            <>
-              {' '}Jersey number{shotChartUnmatchedJerseys.length === 1 ? '' : 's'}{' '}
-              {shotChartUnmatchedJerseys.map((j) => `#${j}`).join(', ')} didn't match anyone on this
-              roster, so that data wasn't saved — add {shotChartUnmatchedJerseys.length === 1 ? 'that player' : 'those players'} first, then re-import.
-            </>
-          )}
-        </p>
       )}
 
       {unmatchedRows.length > 0 && (
