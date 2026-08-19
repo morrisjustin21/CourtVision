@@ -104,9 +104,18 @@ export default function PlayerDevelopment({ player, team, onBack, onPlayerUpdate
 
   return (
     <div>
-      <button onClick={onBack} className="text-sm text-chalkdim hover:text-chalk mb-4">
-        ← {team.name} roster
-      </button>
+      <div className="print:hidden">
+      <div className="flex items-center justify-between mb-4">
+        <button onClick={onBack} className="text-sm text-chalkdim hover:text-chalk">
+          ← {team.name} roster
+        </button>
+        <button
+          onClick={() => window.print()}
+          className="bg-panel2 border border-line text-chalk font-medium text-sm rounded-md px-4 py-2 hover:border-red shrink-0"
+        >
+          Print report
+        </button>
+      </div>
 
       <div className="mb-6">
         <h1 className="font-display text-4xl font-bold">
@@ -199,6 +208,90 @@ export default function PlayerDevelopment({ player, team, onBack, onPlayerUpdate
         {savedAt && !saving && (
           <span className="text-xs text-chalkdim">Saved {savedAt.toLocaleTimeString()}</span>
         )}
+      </div>
+      </div>
+
+      <div className="hidden print:block">
+        <PrintablePlayerReport player={player} team={team} summary={summary} strengths={strengths} weaknesses={weaknesses} growthNotes={growthNotes} />
+      </div>
+    </div>
+  )
+}
+
+function PrintablePlayerReport({ player, team, summary, strengths, weaknesses, growthNotes }) {
+  const today = new Date().toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  })
+
+  const row = (label, value) => (
+    <div className="flex justify-between border-b border-gray-200 py-1">
+      <span className="text-gray-500">{label}</span>
+      <span className="font-semibold text-black">{value}</span>
+    </div>
+  )
+
+  return (
+    <div className="text-black text-sm">
+      <div className="flex items-baseline justify-between border-b-2 border-red pb-2 mb-3">
+        <div>
+          <h1 className="font-display text-3xl font-bold text-black leading-tight">
+            {player.jersey_number != null && `#${player.jersey_number} `}{player.name}
+          </h1>
+          <p className="text-xs text-gray-500">
+            {[player.position, team.name].filter(Boolean).join(' · ') || 'Player development report'}
+          </p>
+        </div>
+        <div className="text-right text-xs text-gray-500">
+          <p className="font-semibold text-black">Player Development Report</p>
+          <p>{today}</p>
+          <p>{summary.games} game{summary.games === 1 ? '' : 's'} played</p>
+        </div>
+      </div>
+
+      {summary.games > 0 && (
+        <>
+          <div className="grid grid-cols-4 gap-x-4 mb-3">
+            <div>{row('PPG', summary.ppg.toFixed(1))}{row('RPG', summary.rpg.toFixed(1))}</div>
+            <div>{row('APG', summary.apg.toFixed(1))}{row('AST/TO', summary.astToRatio == null ? '—' : summary.astToRatio.toFixed(2))}</div>
+            <div>{row('SPG', summary.spg.toFixed(1))}{row('BPG', summary.bpg.toFixed(1))}</div>
+            <div>{row('TOPG', summary.topg.toFixed(1))}{row('MPG', summary.mpg.toFixed(1))}</div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-x-4 mb-4">
+            <div>{row('2PT%', fmtPct(summary.twoPct))}</div>
+            <div>{row('3PT%', fmtPct(summary.threePct))}</div>
+            <div>{row('FT%', fmtPct(summary.ftPct))}</div>
+          </div>
+        </>
+      )}
+
+      <div className="mb-4">
+        <p className="text-[10px] uppercase tracking-wide text-gray-500 font-semibold mb-1.5">
+          Strengths
+        </p>
+        <p className="text-xs text-black whitespace-pre-wrap leading-snug">
+          {strengths || '—'}
+        </p>
+      </div>
+
+      <div className="mb-4">
+        <p className="text-[10px] uppercase tracking-wide text-gray-500 font-semibold mb-1.5">
+          Weaknesses
+        </p>
+        <p className="text-xs text-black whitespace-pre-wrap leading-snug">
+          {weaknesses || '—'}
+        </p>
+      </div>
+
+      <div>
+        <p className="text-[10px] uppercase tracking-wide text-gray-500 font-semibold mb-1.5">
+          Expected Growth (Offseason)
+        </p>
+        <p className="text-xs text-black whitespace-pre-wrap leading-snug">
+          {growthNotes || '—'}
+        </p>
       </div>
     </div>
   )
