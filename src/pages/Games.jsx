@@ -605,6 +605,19 @@ function GameDetail({ game: initialGame, onBack }) {
   const [loading, setLoading] = useState(true)
   const [savingIds, setSavingIds] = useState({})
   const [showEditGame, setShowEditGame] = useState(false)
+  const [deletingGame, setDeletingGame] = useState(false)
+
+  async function deleteGame() {
+    const label = `${game.away_team?.name || 'Away'} @ ${game.home_team?.name || 'Home'} (${game.game_date})`
+    const confirmed = window.confirm(
+      `Delete this game — ${label}? This also deletes every box score entered for it. This can't be undone.`
+    )
+    if (!confirmed) return
+    setDeletingGame(true)
+    await supabase.from('games').delete().eq('id', game.id)
+    setDeletingGame(false)
+    onBack()
+  }
 
   async function loadData() {
     setLoading(true)
@@ -708,6 +721,27 @@ function GameDetail({ game: initialGame, onBack }) {
     setUnmatched((p) => ({ ...p, [side]: p[side].filter((r) => r.jersey !== row.jersey) }))
   }
 
+  const [clearing, setClearing] = useState({})
+
+  async function clearStatsForSide(side, roster, teamName) {
+    if (roster.length === 0) return
+    const confirmed = window.confirm(
+      `Clear all box score stats for ${teamName || 'this team'} in this game? This can't be undone.`
+    )
+    if (!confirmed) return
+    setClearing((p) => ({ ...p, [side]: true }))
+    const playerIds = roster.map((p) => p.id)
+    await supabase.from('player_game_stats').delete().eq('game_id', game.id).in('player_id', playerIds)
+    setStatsByPlayer((prev) => {
+      const next = { ...prev }
+      playerIds.forEach((id) => delete next[id])
+      return next
+    })
+    setUnmatched((p) => ({ ...p, [side]: [] }))
+    setImportError((p) => ({ ...p, [side]: null }))
+    setClearing((p) => ({ ...p, [side]: false }))
+  }
+
   return (
     <div>
       <button onClick={onBack} className="text-sm text-chalkdim hover:text-chalk mb-4">
@@ -744,12 +778,21 @@ function GameDetail({ game: initialGame, onBack }) {
               )}
             </p>
           </div>
-          <button
-            onClick={() => setShowEditGame(true)}
-            className="bg-panel2 border border-line text-chalk font-medium text-sm rounded-md px-4 py-2 hover:border-red shrink-0"
-          >
-            Edit game
-          </button>
+          <div className="flex gap-2 shrink-0">
+            <button
+              onClick={() => setShowEditGame(true)}
+              className="bg-panel2 border border-line text-chalk font-medium text-sm rounded-md px-4 py-2 hover:border-red"
+            >
+              Edit game
+            </button>
+            <button
+              onClick={deleteGame}
+              disabled={deletingGame}
+              className="bg-panel2 border border-alert/40 text-alert font-medium text-sm rounded-md px-4 py-2 hover:border-alert disabled:opacity-60"
+            >
+              {deletingGame ? 'Deleting…' : 'Delete game'}
+            </button>
+          </div>
         </div>
       )}
 
@@ -774,6 +817,8 @@ function GameDetail({ game: initialGame, onBack }) {
             handleImportFile={handleImportFile}
             addUnmatchedPlayer={addUnmatchedPlayer}
             importError={importError}
+            onClearStats={() => clearStatsForSide('away', awayRoster, game.away_team?.name)}
+            clearing={clearing}
           />
           <RosterTable
             roster={homeRoster}
@@ -792,6 +837,8 @@ function GameDetail({ game: initialGame, onBack }) {
             handleImportFile={handleImportFile}
             addUnmatchedPlayer={addUnmatchedPlayer}
             importError={importError}
+            onClearStats={() => clearStatsForSide('home', homeRoster, game.home_team?.name)}
+            clearing={clearing}
           />
         </>
       )}
@@ -816,23 +863,37 @@ function RosterTable({
   handleImportFile,
   addUnmatchedPlayer,
   importError,
+  onClearStats,
+  clearing,
 }) {
   const fileInputId = `box-score-import-${side}`
   const unmatchedRows = unmatched[side] || []
   const error = importError?.[side]
+  const hasAnyStats = roster.some((p) => statsByPlayer[p.id])
 
   return (
     <div className="mb-8">
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
         <h3 className="font-display text-xl font-semibold text-chalkdim uppercase tracking-wide text-sm">
           {label}
         </h3>
-        <label
-          htmlFor={fileInputId}
-          className="text-xs bg-panel2 border border-line hover:border-red text-chalk rounded-md px-3 py-1.5 cursor-pointer"
-        >
-          {importing[side] ? 'Importing…' : 'Import box score file'}
-        </label>
+        <div className="flex items-center gap-2">
+          {hasAnyStats && (
+            <button
+              onClick={onClearStats}
+              disabled={clearing?.[side]}
+              className="text-xs bg-panel2 border border-alert/40 hover:border-alert text-alert rounded-md px-3 py-1.5 disabled:opacity-60"
+            >
+              {clearing?.[side] ? 'Clearing…' : 'Clear stats'}
+            </button>
+          )}
+          <label
+            htmlFor={fileInputId}
+            className="text-xs bg-panel2 border border-line hover:border-red text-chalk rounded-md px-3 py-1.5 cursor-pointer"
+          >
+            {importing[side] ? 'Importing…' : 'Import box score file'}
+          </label>
+        </div>
         <input
           id={fileInputId}
           type="file"
