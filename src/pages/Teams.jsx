@@ -2,6 +2,22 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import ScoutingReport from './ScoutingReport'
 
+const MATCHUP_SLOTS = 5
+
+function emptyMatchupPlan() {
+  return Array.from({ length: MATCHUP_SLOTS }, () => ({
+    opponentPlayerId: '',
+    defenderPlayerId: '',
+    notes: '',
+  }))
+}
+
+function normalizeMatchupPlan(raw) {
+  const base = emptyMatchupPlan()
+  if (!Array.isArray(raw)) return base
+  return base.map((slot, i) => ({ ...slot, ...(raw[i] || {}) }))
+}
+
 export default function Teams() {
   const [teams, setTeams] = useState([])
   const [loading, setLoading] = useState(true)
@@ -187,6 +203,10 @@ function TeamDetail({ team, onBack, onTeamUpdated }) {
   const [notes, setNotes] = useState(team.scouting_notes || '')
   const [savingNotes, setSavingNotes] = useState(false)
   const [savedAt, setSavedAt] = useState(null)
+  const [matchupPlan, setMatchupPlan] = useState(normalizeMatchupPlan(team.matchup_plan))
+  const [savingMatchup, setSavingMatchup] = useState(false)
+  const [matchupSavedAt, setMatchupSavedAt] = useState(null)
+  const [myTeamRoster, setMyTeamRoster] = useState([])
 
   async function saveNotes() {
     setSavingNotes(true)
@@ -194,6 +214,36 @@ function TeamDetail({ team, onBack, onTeamUpdated }) {
     setSavingNotes(false)
     setSavedAt(new Date())
   }
+
+  async function saveMatchupPlan() {
+    setSavingMatchup(true)
+    await supabase.from('teams').update({ matchup_plan: matchupPlan }).eq('id', team.id)
+    setSavingMatchup(false)
+    setMatchupSavedAt(new Date())
+  }
+
+  useEffect(() => {
+    if (team.is_my_team) return
+    async function loadMyRoster() {
+      const { data: myTeam } = await supabase
+        .from('teams')
+        .select('id')
+        .eq('is_my_team', true)
+        .limit(1)
+        .maybeSingle()
+      if (!myTeam) {
+        setMyTeamRoster([])
+        return
+      }
+      const { data: roster } = await supabase
+        .from('players')
+        .select('*')
+        .eq('team_id', myTeam.id)
+        .order('jersey_number')
+      setMyTeamRoster(roster || [])
+    }
+    loadMyRoster()
+  }, [team.id, team.is_my_team])
 
   async function loadPlayers() {
     setLoading(true)
@@ -326,6 +376,13 @@ function TeamDetail({ team, onBack, onTeamUpdated }) {
           onSaveNotes={saveNotes}
           savingNotes={savingNotes}
           savedAt={savedAt}
+          opponentRoster={players}
+          myTeamRoster={myTeamRoster}
+          matchupPlan={matchupPlan}
+          setMatchupPlan={setMatchupPlan}
+          onSaveMatchup={saveMatchupPlan}
+          savingMatchup={savingMatchup}
+          matchupSavedAt={matchupSavedAt}
         />
       )}
 
@@ -471,3 +528,4 @@ function TeamDetail({ team, onBack, onTeamUpdated }) {
     </div>
   )
 }
+
