@@ -281,6 +281,9 @@ export default function Games() {
             setShowNewGame(false)
             loadAll()
           }}
+          onTeamCreated={(newTeam) =>
+            setTeams((prev) => [...prev, newTeam].sort((a, b) => a.name.localeCompare(b.name)))
+          }
         />
       )}
 
@@ -324,7 +327,7 @@ export default function Games() {
   )
 }
 
-function GameForm({ teams, seasons = [], game, onCancel, onSaved }) {
+function GameForm({ teams, seasons = [], game, onCancel, onSaved, onTeamCreated }) {
   const [date, setDate] = useState(game?.game_date || new Date().toISOString().slice(0, 10))
   const [season, setSeason] = useState(game?.season || guessSeason(game?.game_date || new Date().toISOString().slice(0, 10)))
   const [homeTeamId, setHomeTeamId] = useState(game?.home_team_id || '')
@@ -333,6 +336,51 @@ function GameForm({ teams, seasons = [], game, onCancel, onSaved }) {
   const [awayScore, setAwayScore] = useState(game?.away_score ?? '')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [newTeamFor, setNewTeamFor] = useState(null) // null | 'home' | 'away'
+  const [newTeamName, setNewTeamName] = useState('')
+  const [newTeamLeague, setNewTeamLeague] = useState('')
+  const [newTeamIsMyTeam, setNewTeamIsMyTeam] = useState(false)
+  const [savingNewTeam, setSavingNewTeam] = useState(false)
+  const [newTeamError, setNewTeamError] = useState('')
+
+  function handleTeamSelect(side, value) {
+    if (value === '__new__') {
+      setNewTeamFor(side)
+      setNewTeamName('')
+      setNewTeamLeague('')
+      setNewTeamIsMyTeam(false)
+      setNewTeamError('')
+    } else {
+      if (side === 'home') setHomeTeamId(value)
+      else setAwayTeamId(value)
+    }
+  }
+
+  async function handleCreateTeam() {
+    if (!newTeamName.trim()) {
+      setNewTeamError('Team name is required.')
+      return
+    }
+    setSavingNewTeam(true)
+    const { data, error: insertError } = await supabase
+      .from('teams')
+      .insert({
+        name: newTeamName.trim(),
+        league: newTeamLeague || null,
+        is_my_team: newTeamIsMyTeam,
+      })
+      .select()
+      .single()
+    setSavingNewTeam(false)
+    if (insertError || !data) {
+      setNewTeamError("Couldn't create that team. Try again.")
+      return
+    }
+    onTeamCreated?.(data)
+    if (newTeamFor === 'home') setHomeTeamId(data.id)
+    else setAwayTeamId(data.id)
+    setNewTeamFor(null)
+  }
 
   function handleDateChange(value) {
     setDate(value)
@@ -404,14 +452,29 @@ function GameForm({ teams, seasons = [], game, onCancel, onSaved }) {
           required
           disabled={!!game}
           value={awayTeamId}
-          onChange={(e) => setAwayTeamId(e.target.value)}
+          onChange={(e) => handleTeamSelect('away', e.target.value)}
           className="w-full bg-panel2 border border-line rounded-md px-3 py-2 focus:border-red outline-none disabled:opacity-60"
         >
           <option value="">Select team</option>
           {teams.map((t) => (
             <option key={t.id} value={t.id}>{t.name}</option>
           ))}
+          {!game && <option value="__new__">+ Add new team…</option>}
         </select>
+        {newTeamFor === 'away' && (
+          <NewTeamInlineForm
+            name={newTeamName}
+            setName={setNewTeamName}
+            league={newTeamLeague}
+            setLeague={setNewTeamLeague}
+            isMyTeam={newTeamIsMyTeam}
+            setIsMyTeam={setNewTeamIsMyTeam}
+            saving={savingNewTeam}
+            error={newTeamError}
+            onSave={handleCreateTeam}
+            onCancel={() => setNewTeamFor(null)}
+          />
+        )}
       </div>
       <div>
         <label className="block text-xs uppercase tracking-wide text-chalkdim mb-1.5">Home team</label>
@@ -419,14 +482,29 @@ function GameForm({ teams, seasons = [], game, onCancel, onSaved }) {
           required
           disabled={!!game}
           value={homeTeamId}
-          onChange={(e) => setHomeTeamId(e.target.value)}
+          onChange={(e) => handleTeamSelect('home', e.target.value)}
           className="w-full bg-panel2 border border-line rounded-md px-3 py-2 focus:border-red outline-none disabled:opacity-60"
         >
           <option value="">Select team</option>
           {teams.map((t) => (
             <option key={t.id} value={t.id}>{t.name}</option>
           ))}
+          {!game && <option value="__new__">+ Add new team…</option>}
         </select>
+        {newTeamFor === 'home' && (
+          <NewTeamInlineForm
+            name={newTeamName}
+            setName={setNewTeamName}
+            league={newTeamLeague}
+            setLeague={setNewTeamLeague}
+            isMyTeam={newTeamIsMyTeam}
+            setIsMyTeam={setNewTeamIsMyTeam}
+            saving={savingNewTeam}
+            error={newTeamError}
+            onSave={handleCreateTeam}
+            onCancel={() => setNewTeamFor(null)}
+          />
+        )}
       </div>
       {game && (
         <p className="text-xs text-chalkdim sm:col-span-2 -mt-2">
@@ -467,6 +545,55 @@ function GameForm({ teams, seasons = [], game, onCancel, onSaved }) {
         </button>
       </div>
     </form>
+  )
+}
+
+function NewTeamInlineForm({
+  name,
+  setName,
+  league,
+  setLeague,
+  isMyTeam,
+  setIsMyTeam,
+  saving,
+  error,
+  onSave,
+  onCancel,
+}) {
+  return (
+    <div className="mt-2 bg-panel2 border border-red/40 rounded-md p-3 space-y-2">
+      <input
+        autoFocus
+        placeholder="New team name"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        className="w-full bg-panel border border-line rounded-md px-2.5 py-1.5 text-sm focus:border-red outline-none"
+      />
+      <input
+        placeholder="League (optional)"
+        value={league}
+        onChange={(e) => setLeague(e.target.value)}
+        className="w-full bg-panel border border-line rounded-md px-2.5 py-1.5 text-sm focus:border-red outline-none"
+      />
+      <label className="flex items-center gap-2 text-xs text-chalkdim">
+        <input type="checkbox" checked={isMyTeam} onChange={(e) => setIsMyTeam(e.target.checked)} />
+        This is my team
+      </label>
+      {error && <p className="text-alert text-xs">{error}</p>}
+      <div className="flex justify-end gap-2">
+        <button type="button" onClick={onCancel} className="text-xs text-chalkdim hover:text-chalk px-2 py-1">
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={onSave}
+          disabled={saving}
+          className="bg-red text-white font-semibold text-xs rounded-md px-3 py-1.5 hover:bg-red/90 disabled:opacity-60"
+        >
+          {saving ? 'Adding…' : 'Add team'}
+        </button>
+      </div>
+    </div>
   )
 }
 
