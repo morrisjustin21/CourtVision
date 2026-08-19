@@ -233,9 +233,18 @@ export default function ScoutingReport({ team, notes, setNotes, onSaveNotes, sav
 
   return (
     <div>
-      <p className="text-chalkdim text-sm mb-4">
-        Based on {summary.gamesWithStats} game{summary.gamesWithStats === 1 ? '' : 's'} with stats entered.
-      </p>
+      <div className="print:hidden">
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-chalkdim text-sm">
+          Based on {summary.gamesWithStats} game{summary.gamesWithStats === 1 ? '' : 's'} with stats entered.
+        </p>
+        <button
+          onClick={() => window.print()}
+          className="bg-panel2 border border-line text-chalk font-medium text-sm rounded-md px-4 py-2 hover:border-red shrink-0"
+        >
+          Print report
+        </button>
+      </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
         <StatCard label="PPG" value={summary.ppg.toFixed(1)} />
@@ -318,6 +327,138 @@ export default function ScoutingReport({ team, notes, setNotes, onSaveNotes, sav
       </div>
 
       <NotesSection notes={notes} setNotes={setNotes} onSave={onSaveNotes} saving={savingNotes} savedAt={savedAt} />
+      </div>
+
+      <div className="hidden print:block">
+        <PrintableReport
+          team={team}
+          summary={summary}
+          top3Players={top3Players}
+          topScorers={topScorers}
+          topRebounders={topRebounders}
+          topAssists={topAssists}
+          topSteals={topSteals}
+          notes={notes}
+        />
+      </div>
+    </div>
+  )
+}
+
+function PrintableReport({
+  team,
+  summary,
+  top3Players,
+  topScorers,
+  topRebounders,
+  topAssists,
+  topSteals,
+  notes,
+}) {
+  const today = new Date().toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  })
+
+  const row = (label, value) => (
+    <div className="flex justify-between border-b border-gray-200 py-1">
+      <span className="text-gray-500">{label}</span>
+      <span className="font-semibold text-black">{value}</span>
+    </div>
+  )
+
+  return (
+    <div className="text-black text-sm">
+      <div className="flex items-baseline justify-between border-b-2 border-red pb-2 mb-3">
+        <div>
+          <h1 className="font-display text-3xl font-bold text-black leading-tight">
+            {team.name}
+          </h1>
+          <p className="text-xs text-gray-500">
+            {[team.league, team.division].filter(Boolean).join(' · ') || 'Scouting report'}
+          </p>
+        </div>
+        <div className="text-right text-xs text-gray-500">
+          <p className="font-semibold text-black">Scouting Report</p>
+          <p>{today}</p>
+          <p>{summary.gamesWithStats} game{summary.gamesWithStats === 1 ? '' : 's'} tracked</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-4 gap-x-4 mb-3">
+        <div>{row('PPG', summary.ppg.toFixed(1))}{row('RPG', summary.rpg.toFixed(1))}</div>
+        <div>{row('APG', summary.apg.toFixed(1))}{row('AST/TO', summary.astToRatio == null ? '—' : summary.astToRatio.toFixed(2))}</div>
+        <div>{row('SPG', summary.spg.toFixed(1))}{row('BPG', summary.bpg.toFixed(1))}</div>
+        <div>{row('TOPG', summary.topg.toFixed(1))}{row('PFPG', summary.pfpg.toFixed(1))}</div>
+      </div>
+
+      <div className="grid grid-cols-4 gap-x-4 mb-3">
+        <div>{row('2PT%', fmtPct(summary.twoPct))}</div>
+        <div>{row('3PT%', fmtPct(summary.threePct))}</div>
+        <div>{row('FT%', fmtPct(summary.ftPct))}</div>
+        <div>{row('3PA Rate', fmtPct(summary.threeRate))}</div>
+      </div>
+
+      <div className="grid grid-cols-4 gap-x-4 mb-4">
+        <div>{row('Pace', summary.pace == null ? '—' : summary.pace.toFixed(1))}</div>
+        <div>{row('Off. Rating', summary.offRating == null ? '—' : summary.offRating.toFixed(1))}</div>
+      </div>
+
+      {top3Players.length > 0 && (
+        <div className="mb-4">
+          <p className="text-[10px] uppercase tracking-wide text-gray-500 font-semibold mb-1.5">
+            Top 3 Players
+          </p>
+          <div className="grid grid-cols-3 gap-3">
+            {top3Players.map((p, i) => (
+              <div key={p.id} className="border border-gray-300 rounded px-2.5 py-2">
+                <p className="font-semibold text-black text-xs">
+                  {i + 1}. {p.jersey_number != null && `#${p.jersey_number} `}{p.name}
+                </p>
+                <p className="text-[11px] text-gray-600">
+                  {p.ppg.toFixed(1)} PPG · {p.rpg.toFixed(1)} RPG · {p.apg.toFixed(1)} APG
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="mb-4">
+        <p className="text-[10px] uppercase tracking-wide text-gray-500 font-semibold mb-1.5">
+          Leaders by category
+        </p>
+        <div className="grid grid-cols-4 gap-3 text-[11px]">
+          <PrintLeaderList title="Scoring" players={topScorers} statKey="ppg" suffix="PPG" />
+          <PrintLeaderList title="Rebounding" players={topRebounders} statKey="rpg" suffix="RPG" />
+          <PrintLeaderList title="Assists" players={topAssists} statKey="apg" suffix="APG" />
+          <PrintLeaderList title="Steals" players={topSteals} statKey="spg" suffix="SPG" />
+        </div>
+      </div>
+
+      {notes && (
+        <div>
+          <p className="text-[10px] uppercase tracking-wide text-gray-500 font-semibold mb-1.5">
+            Game plan notes
+          </p>
+          <p className="text-xs text-black whitespace-pre-wrap leading-snug">{notes}</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function PrintLeaderList({ title, players, statKey, suffix }) {
+  if (players.length === 0) return null
+  return (
+    <div>
+      <p className="font-semibold text-black mb-0.5">{title}</p>
+      {players.slice(0, 3).map((p) => (
+        <p key={p.id} className="text-gray-700">
+          {p.name} — {p[statKey].toFixed(1)} {suffix}
+        </p>
+      ))}
     </div>
   )
 }
