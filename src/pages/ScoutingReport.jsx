@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../supabaseClient'
+import { useShotZoneData, ShotChartSvg } from './ShotChart'
 
 function pct(made, att) {
   if (!att) return null
@@ -79,6 +80,7 @@ export default function ScoutingReport({
   const [loading, setLoading] = useState(true)
   const [statsRows, setStatsRows] = useState([])
   const [teamGames, setTeamGames] = useState([])
+  const { loading: shotLoading, aggregated: shotAgg, hasData: hasShotData, totals: shotTotals } = useShotZoneData(team)
 
   useEffect(() => {
     async function load() {
@@ -359,6 +361,29 @@ export default function ScoutingReport({
       </div>
 
       <h3 className="font-display text-xl font-semibold text-chalkdim uppercase tracking-wide text-sm mb-3">
+        Shot Chart
+      </h3>
+      <div className="mb-6">
+        {shotLoading ? (
+          <p className="text-chalkdim">Loading…</p>
+        ) : !hasShotData ? (
+          <div className="border border-dashed border-line rounded-lg p-8 text-center text-chalkdim text-sm">
+            No shot chart data imported yet for {team.name}. Import a Hudl shot chart PDF from any
+            of their logged games (on the game's box score screen) to see zone tendencies here.
+          </div>
+        ) : (
+          <div>
+            <p className="text-chalkdim text-sm mb-3">
+              {shotTotals.made}/{shotTotals.attempted} field goals (
+              {((shotTotals.made / shotTotals.attempted) * 100).toFixed(1)}%) across every zone-mapped
+              shot imported for {team.name}.
+            </p>
+            <ShotChartSvg aggregated={shotAgg} variant="dark" className="w-full max-w-md mx-auto" />
+          </div>
+        )}
+      </div>
+
+      <h3 className="font-display text-xl font-semibold text-chalkdim uppercase tracking-wide text-sm mb-3">
         Pace & Efficiency
       </h3>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-1">
@@ -474,6 +499,9 @@ export default function ScoutingReport({
           matchupPlan={matchupPlan}
           opponentRoster={opponentRoster}
           myTeamRoster={myTeamRoster}
+          hasShotData={hasShotData}
+          shotAgg={shotAgg}
+          shotTotals={shotTotals}
         />
       </div>
     </div>
@@ -580,6 +608,9 @@ function PrintableReport({
   matchupPlan,
   opponentRoster,
   myTeamRoster,
+  hasShotData,
+  shotAgg,
+  shotTotals,
 }) {
   const today = new Date().toLocaleDateString(undefined, {
     year: 'numeric',
@@ -633,6 +664,12 @@ function PrintableReport({
         <div>{row('FT%', fmtPct(summary.ftPct))}</div>
         <div>{row('3PA Rate', fmtPct(summary.threeRate))}</div>
       </div>
+
+      {hasShotData && (
+        <div className="mb-4 flex justify-center">
+          <ShotChartSvg aggregated={shotAgg} variant="light" className="w-full max-w-[260px]" />
+        </div>
+      )}
 
       <div className="grid grid-cols-4 gap-x-4 mb-4">
         <div>{row('Pace', summary.pace == null ? '—' : summary.pace.toFixed(1))}</div>
