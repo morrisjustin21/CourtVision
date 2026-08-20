@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../supabaseClient'
+import { useCurrentSeason } from '../useCurrentSeason'
 
 function StatCard({ label, value, sub }) {
   return (
@@ -28,6 +29,8 @@ export default function PlayerDevelopment({ player, team, onBack, onPlayerUpdate
   const [growthNotes, setGrowthNotes] = useState(player.growth_notes || '')
   const [saving, setSaving] = useState(false)
   const [savedAt, setSavedAt] = useState(null)
+  const { season: currentSeason, loading: seasonLoading } = useCurrentSeason()
+  const [seasonFilter, setSeasonFilter] = useState(null)
 
   useEffect(() => {
     async function load() {
@@ -42,9 +45,25 @@ export default function PlayerDevelopment({ player, team, onBack, onPlayerUpdate
     load()
   }, [player.id])
 
+  useEffect(() => {
+    if (!seasonLoading && seasonFilter === null) {
+      setSeasonFilter(currentSeason || 'all')
+    }
+  }, [seasonLoading, currentSeason, seasonFilter])
+
+  const seasons = useMemo(
+    () => [...new Set(statsRows.map((r) => r.game?.season).filter(Boolean))].sort().reverse(),
+    [statsRows]
+  )
+
+  const filteredStatsRows = useMemo(() => {
+    if (!seasonFilter || seasonFilter === 'all') return statsRows
+    return statsRows.filter((r) => r.game?.season === seasonFilter)
+  }, [statsRows, seasonFilter])
+
   const summary = useMemo(() => {
-    const games = statsRows.length
-    const totals = statsRows.reduce(
+    const games = filteredStatsRows.length
+    const totals = filteredStatsRows.reduce(
       (acc, r) => {
         acc.points += r.points || 0
         acc.two_made += r.two_made || 0
@@ -87,7 +106,7 @@ export default function PlayerDevelopment({ player, team, onBack, onPlayerUpdate
       totalRebounds: totals.rebounds,
       totalAssists: totals.assists,
     }
-  }, [statsRows])
+  }, [filteredStatsRows])
 
   async function saveNotes() {
     setSaving(true)
@@ -105,16 +124,30 @@ export default function PlayerDevelopment({ player, team, onBack, onPlayerUpdate
   return (
     <div>
       <div className="print:hidden">
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
         <button onClick={onBack} className="text-sm text-chalkdim hover:text-chalk">
           ← {team.name} roster
         </button>
-        <button
-          onClick={() => window.print()}
-          className="bg-panel2 border border-line text-chalk font-medium text-sm rounded-md px-4 py-2 hover:border-red shrink-0"
-        >
-          Print report
-        </button>
+        <div className="flex items-center gap-2">
+          {seasons.length > 0 && (
+            <select
+              value={seasonFilter || 'all'}
+              onChange={(e) => setSeasonFilter(e.target.value)}
+              className="bg-panel2 border border-line rounded-md px-3 py-2 text-sm focus:border-red outline-none"
+            >
+              <option value="all">All seasons</option>
+              {seasons.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          )}
+          <button
+            onClick={() => window.print()}
+            className="bg-panel2 border border-line text-chalk font-medium text-sm rounded-md px-4 py-2 hover:border-red shrink-0"
+          >
+            Print report
+          </button>
+        </div>
       </div>
 
       <div className="mb-6">
@@ -133,13 +166,15 @@ export default function PlayerDevelopment({ player, team, onBack, onPlayerUpdate
         <p className="text-chalkdim">Loading…</p>
       ) : summary.games === 0 ? (
         <div className="border border-dashed border-line rounded-lg p-10 text-center text-chalkdim mb-6">
-          No box scores logged for {player.name} yet. Once stats are entered for a game they play in,
-          their season line will show up here.
+          No box scores logged for {player.name}
+          {seasonFilter && seasonFilter !== 'all' ? ` in ${seasonFilter}` : ''} yet. Once stats are
+          entered for a game they play in, their season line will show up here.
         </div>
       ) : (
         <>
           <p className="text-chalkdim text-sm mb-4">
-            {summary.games} game{summary.games === 1 ? '' : 's'} played this season.
+            {summary.games} game{summary.games === 1 ? '' : 's'} played
+            {seasonFilter && seasonFilter !== 'all' ? ` in ${seasonFilter}` : ' (all seasons)'}.
           </p>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
