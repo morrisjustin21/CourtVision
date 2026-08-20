@@ -3,6 +3,7 @@ import { supabase } from '../supabaseClient'
 import ScoutingReport from './ScoutingReport'
 import PlayerDevelopment from './PlayerDevelopment'
 import AdditionalStats from './AdditionalStats'
+import { useCurrentSeason } from '../useCurrentSeason'
 
 const MATCHUP_SLOTS = 5
 
@@ -22,20 +23,58 @@ function normalizeMatchupPlan(raw) {
 
 export default function Teams() {
   const [teams, setTeams] = useState([])
+  const [gameSeasonsByTeam, setGameSeasonsByTeam] = useState({}) // teamId -> Set of seasons
   const [loading, setLoading] = useState(true)
   const [selectedTeam, setSelectedTeam] = useState(null)
   const [showNewTeam, setShowNewTeam] = useState(false)
+  const { season: currentSeason, loading: seasonLoading } = useCurrentSeason()
+  const [seasonFilter, setSeasonFilter] = useState(null)
 
   async function loadTeams() {
     setLoading(true)
-    const { data } = await supabase.from('teams').select('*').order('name')
-    setTeams(data || [])
+    const [{ data: teamsData }, { data: gamesData }] = await Promise.all([
+      supabase.from('teams').select('*').order('name'),
+      supabase.from('games').select('home_team_id, away_team_id, season'),
+    ])
+    setTeams(teamsData || [])
+
+    const byTeam = {}
+    ;(gamesData || []).forEach((g) => {
+      if (!g.season) return
+      for (const teamId of [g.home_team_id, g.away_team_id]) {
+        if (!byTeam[teamId]) byTeam[teamId] = new Set()
+        byTeam[teamId].add(g.season)
+      }
+    })
+    setGameSeasonsByTeam(byTeam)
     setLoading(false)
   }
 
   useEffect(() => {
     loadTeams()
   }, [])
+
+  useEffect(() => {
+    if (!seasonLoading && seasonFilter === null) {
+      setSeasonFilter(currentSeason || 'all')
+    }
+  }, [seasonLoading, currentSeason, seasonFilter])
+
+  const seasons = [...new Set(Object.values(gameSeasonsByTeam).flatMap((s) => [...s]))].sort().reverse()
+
+  // A team shows up when it's your own team, it has no games logged at all yet
+  // (so newly-added teams don't just vanish), or it has a game in the selected
+  // season. Otherwise it's an old opponent from a season you're not looking at.
+  const visibleTeams =
+    !seasonFilter || seasonFilter === 'all'
+      ? teams
+      : teams.filter((t) => {
+          if (t.is_my_team) return true
+          const teamSeasons = gameSeasonsByTeam[t.id]
+          if (!teamSeasons) return true
+          return teamSeasons.has(seasonFilter)
+        })
+  const hiddenCount = teams.length - visibleTeams.length
 
   if (selectedTeam) {
     return (
@@ -52,15 +91,40 @@ export default function Teams() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
         <h1 className="font-display text-4xl font-bold">Teams</h1>
-        <button
-          onClick={() => setShowNewTeam(true)}
-          className="bg-red text-white font-semibold text-sm rounded-md px-4 py-2 hover:bg-red/90"
-        >
-          + Add team
-        </button>
+        <div className="flex items-center gap-2">
+          {seasons.length > 0 && (
+            <select
+              value={seasonFilter || 'all'}
+              onChange={(e) => setSeasonFilter(e.target.value)}
+              className="bg-panel2 border border-line rounded-md px-3 py-2 text-sm focus:border-red outline-none"
+            >
+              <option value="all">All seasons</option>
+              {seasons.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          )}
+          <button
+            onClick={() => setShowNewTeam(true)}
+            className="bg-red text-white font-semibold text-sm rounded-md px-4 py-2 hover:bg-red/90"
+          >
+            + Add team
+          </button>
+        </div>
       </div>
+      {seasonFilter && seasonFilter !== 'all' && hiddenCount > 0 && (
+        <p className="text-chalkdim text-xs mb-4">
+          Showing teams for {seasonFilter}. {hiddenCount} team{hiddenCount === 1 ? '' : 's'} from other
+          seasons {hiddenCount === 1 ? 'is' : 'are'} hidden —{' '}
+          <button onClick={() => setSeasonFilter('all')} className="text-red hover:underline">
+            show all seasons
+          </button>
+          .
+        </p>
+      )}
+      <div className="mb-4" />
 
       {showNewTeam && (
         <TeamForm
@@ -74,13 +138,20 @@ export default function Teams() {
 
       {loading ? (
         <p className="text-chalkdim">Loading…</p>
-      ) : teams.length === 0 ? (
+      ) : visibleTeams.length === 0 ? (
         <div className="border border-dashed border-line rounded-lg p-10 text-center text-chalkdim">
-          No teams yet. Add your first team to get started.
+          {teams.length === 0
+            ? 'No teams yet. Add your first team to get started.'
+            : `No teams for ${seasonFilter}. `}
+          {teams.length > 0 && (
+            <button onClick={() => setSeasonFilter('all')} className="text-red hover:underline">
+              Show all seasons
+            </button>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {teams.map((t) => (
+          {visibleTeams.map((t) => (
             <button
               key={t.id}
               onClick={() => setSelectedTeam(t)}
