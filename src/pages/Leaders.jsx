@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../supabaseClient'
+import { useCurrentSeason } from '../useCurrentSeason'
 
 const SORTABLE = [
   { key: 'ppg', label: 'PPG' },
@@ -13,7 +14,8 @@ export default function Leaders() {
   const [rawRows, setRawRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [sortKey, setSortKey] = useState('ppg')
-  const [seasonFilter, setSeasonFilter] = useState('all')
+  const [seasonFilter, setSeasonFilter] = useState(null)
+  const { season: currentSeason, loading: seasonLoading } = useCurrentSeason()
 
   useEffect(() => {
     async function load() {
@@ -27,6 +29,12 @@ export default function Leaders() {
     load()
   }, [])
 
+  useEffect(() => {
+    if (!seasonLoading && seasonFilter === null) {
+      setSeasonFilter(currentSeason || 'all')
+    }
+  }, [seasonLoading, currentSeason, seasonFilter])
+
   const seasons = useMemo(
     () => [...new Set(rawRows.map((r) => r.game?.season).filter(Boolean))].sort().reverse(),
     [rawRows]
@@ -34,7 +42,7 @@ export default function Leaders() {
 
   const rows = useMemo(() => {
     const filtered =
-      seasonFilter === 'all' ? rawRows : rawRows.filter((r) => r.game?.season === seasonFilter)
+      !seasonFilter || seasonFilter === 'all' ? rawRows : rawRows.filter((r) => r.game?.season === seasonFilter)
 
     const byPlayer = {}
     filtered.forEach((row) => {
@@ -86,7 +94,7 @@ export default function Leaders() {
         <div className="flex flex-wrap items-center gap-2">
           {seasons.length > 0 && (
             <select
-              value={seasonFilter}
+              value={seasonFilter || 'all'}
               onChange={(e) => setSeasonFilter(e.target.value)}
               className="bg-panel2 border border-line rounded-md px-3 py-2 text-sm focus:border-red outline-none"
             >
