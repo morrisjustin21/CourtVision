@@ -61,29 +61,37 @@ function parseScheduleRows(html) {
     const opponentCell = cellText(1)
     const resultsCell = cellText(2)
 
-    const scoreMatch = /(\d+)\s*-\s*(\d+)\s*(W|L)/i.exec(resultsCell)
-    if (!scoreMatch) continue // "No Score" or otherwise incomplete
-
     if (opponentCell.startsWith('TBA')) continue // tournament placeholder
 
+    const [, mm, dd, yy] = dateMatch
+    const year = 2000 + parseInt(yy, 10)
+    const gameDate = `${year}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`
     const isHome = !opponentCell.trim().startsWith('@')
     const opponentRaw = opponentCell
       .replace(/^@\s*/, '')
       .replace(/\s*\(\d[A-Z]?\)\s*\*{0,2}\s*$/i, '')
       .trim()
 
-    const [, mm, dd, yy] = dateMatch
-    const year = 2000 + parseInt(yy, 10)
-    const gameDate = `${year}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`
-
-    rows.push({
-      gameDate,
-      opponentRaw,
-      isHome,
-      teamScore: parseInt(scoreMatch[1], 10),
-      opponentScore: parseInt(scoreMatch[2], 10),
-      result: scoreMatch[3].toUpperCase(),
-    })
+    const scoreMatch = /(\d+)\s*-\s*(\d+)\s*(W|L)/i.exec(resultsCell)
+    if (scoreMatch) {
+      rows.push({
+        type: 'score',
+        gameDate,
+        opponentRaw,
+        isHome,
+        teamScore: parseInt(scoreMatch[1], 10),
+        opponentScore: parseInt(scoreMatch[2], 10),
+        result: scoreMatch[3].toUpperCase(),
+      })
+    } else if (/^no score$/i.test(resultsCell)) {
+      rows.push({
+        type: 'schedule',
+        gameDate,
+        opponentRaw,
+        isHome,
+      })
+    }
+    // Anything else (unrecognized results text) is skipped rather than guessed at.
   }
   return rows
 }
@@ -135,9 +143,10 @@ export default async function handler(req, res) {
             matched_opponent_team_id: matchedOpponentTeamId,
             game_date: row.gameDate,
             is_home: row.isHome,
-            team_score: row.teamScore,
-            opponent_score: row.opponentScore,
-            result: row.result,
+            entry_type: row.type,
+            team_score: row.type === 'score' ? row.teamScore : null,
+            opponent_score: row.type === 'score' ? row.opponentScore : null,
+            result: row.type === 'score' ? row.result : null,
             status: 'pending',
           })
           .select()
