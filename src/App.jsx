@@ -4,6 +4,7 @@ import Login from './pages/Login'
 import Teams from './pages/Teams'
 import Games from './pages/Games'
 import Leaders from './pages/Leaders'
+import Automation from './pages/Automation'
 import Nav from './components/Nav'
 
 export default function App() {
@@ -37,6 +38,7 @@ export default function App() {
         {view === 'teams' && <Teams />}
         {view === 'games' && <Games />}
         {view === 'stats' && <Leaders />}
+        {view === 'automation' && <Automation />}
       </main>
       <button
         onClick={() => supabase.auth.signOut()}
