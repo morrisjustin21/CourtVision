@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../supabaseClient'
+import Logo from '../components/Logo'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -20,16 +21,8 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <div className="inline-flex items-center gap-2 mb-2">
-            <svg width="14" height="14" viewBox="0 0 18 18" className="text-red shrink-0">
-              <circle cx="9" cy="9" r="6.5" stroke="currentColor" strokeWidth="1.4" fill="none" />
-              <line x1="9" y1="0.5" x2="9" y2="3.5" stroke="currentColor" strokeWidth="1.4" />
-              <line x1="9" y1="14.5" x2="9" y2="17.5" stroke="currentColor" strokeWidth="1.4" />
-              <line x1="0.5" y1="9" x2="3.5" y2="9" stroke="currentColor" strokeWidth="1.4" />
-              <line x1="14.5" y1="9" x2="17.5" y2="9" stroke="currentColor" strokeWidth="1.4" />
-              <circle cx="9" cy="9" r="1.3" fill="currentColor" />
-            </svg>
-            <span className="text-xs tracking-[0.2em] text-chalkdim uppercase">CourtVision</span>
+          <div className="flex justify-center mb-5">
+            <Logo scale={1.6} />
           </div>
           <h1 className="font-display text-5xl font-bold tracking-tight">Sign in</h1>
         </div>
