@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../supabaseClient'
+import { useCurrentSeason } from '../useCurrentSeason'
 
 function pct(made, att) {
   if (!att) return null
@@ -79,13 +80,15 @@ export default function ScoutingReport({
   const [loading, setLoading] = useState(true)
   const [statsRows, setStatsRows] = useState([])
   const [teamGames, setTeamGames] = useState([])
+  const { season: currentSeason, loading: seasonLoading } = useCurrentSeason()
+  const [seasonFilter, setSeasonFilter] = useState(null) // null = not yet defaulted
 
   useEffect(() => {
     async function load() {
       setLoading(true)
       const { data: teamGamesData } = await supabase
         .from('games')
-        .select('id, home_team_id, away_team_id, home_score, away_score')
+        .select('id, home_team_id, away_team_id, home_score, away_score, season')
         .or(`home_team_id.eq.${team.id},away_team_id.eq.${team.id}`)
 
       const { data: players } = await supabase
@@ -110,7 +113,31 @@ export default function ScoutingReport({
     load()
   }, [team.id])
 
+  useEffect(() => {
+    if (!seasonLoading && seasonFilter === null) {
+      setSeasonFilter(currentSeason || 'all')
+    }
+  }, [seasonLoading, currentSeason, seasonFilter])
+
+  const seasons = useMemo(
+    () => [...new Set(teamGames.map((g) => g.season).filter(Boolean))].sort().reverse(),
+    [teamGames]
+  )
+
+  const filteredTeamGames = useMemo(
+    () => (seasonFilter && seasonFilter !== 'all' ? teamGames.filter((g) => g.season === seasonFilter) : teamGames),
+    [teamGames, seasonFilter]
+  )
+
+  const filteredStatsRows = useMemo(() => {
+    if (!seasonFilter || seasonFilter === 'all') return statsRows
+    const gameIds = new Set(filteredTeamGames.map((g) => g.id))
+    return statsRows.filter((r) => gameIds.has(r.game_id))
+  }, [statsRows, filteredTeamGames, seasonFilter])
+
   const summary = useMemo(() => {
+    const statsRows = filteredStatsRows
+    const teamGames = filteredTeamGames
     const gamesWithStats = new Set(statsRows.map((r) => r.game_id)).size
     const totals = statsRows.reduce(
       (acc, r) => {
@@ -199,11 +226,11 @@ export default function ScoutingReport({
       netRating,
       gamesForDef,
     }
-  }, [statsRows, teamGames, team.id])
+  }, [filteredStatsRows, filteredTeamGames, team.id])
 
   const playerAgg = useMemo(() => {
     const byPlayer = {}
-    statsRows.forEach((r) => {
+    filteredStatsRows.forEach((r) => {
       const p = r.player
       if (!p) return
       if (!byPlayer[p.id]) {
@@ -253,7 +280,7 @@ export default function ScoutingReport({
         effpg: p.games ? eff / p.games : 0,
       }
     })
-  }, [statsRows])
+  }, [filteredStatsRows])
 
   const topScorers = useMemo(
     () => [...playerAgg].sort((a, b) => b.ppg - a.ppg).slice(0, 5),
@@ -281,12 +308,29 @@ export default function ScoutingReport({
   if (summary.gamesWithStats === 0) {
     return (
       <div>
+        {seasons.length > 0 && (
+          <div className="flex justify-end mb-4">
+            <select
+              value={seasonFilter || 'all'}
+              onChange={(e) => setSeasonFilter(e.target.value)}
+              className="bg-panel2 border border-line rounded-md px-3 py-2 text-sm focus:border-red outline-none"
+            >
+              <option value="all">All seasons</option>
+              {seasons.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </div>
+        )}
         <div className="border border-dashed border-line rounded-lg p-10 text-center text-chalkdim mb-6">
-          No box scores logged for {team.name} yet. Once you enter stats for a game involving this
-          team, tendencies and shooting splits will show up here automatically.
+          No box scores logged for {team.name}
+          {seasonFilter && seasonFilter !== 'all' ? ` in ${seasonFilter}` : ''} yet. Once you enter
+          stats for a game involving this team, tendencies and shooting splits will show up here
+          automatically.
           {teamGames.length > 0 && (
             <p className="mt-2 text-xs">
-              ({teamGames.length} game{teamGames.length === 1 ? '' : 's'} logged, but no stats entered yet.)
+              ({teamGames.length} game{teamGames.length === 1 ? '' : 's'} logged in total, but no stats
+              entered{seasonFilter && seasonFilter !== 'all' ? ' for this season' : ''} yet.)
             </p>
           )}
         </div>
@@ -321,16 +365,30 @@ export default function ScoutingReport({
   return (
     <div>
       <div className="print:hidden">
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
         <p className="text-chalkdim text-sm">
           Based on {summary.gamesWithStats} game{summary.gamesWithStats === 1 ? '' : 's'} with stats entered.
         </p>
-        <button
-          onClick={() => window.print()}
-          className="bg-panel2 border border-line text-chalk font-medium text-sm rounded-md px-4 py-2 hover:border-red shrink-0"
-        >
-          Print report
-        </button>
+        <div className="flex items-center gap-2">
+          {seasons.length > 0 && (
+            <select
+              value={seasonFilter || 'all'}
+              onChange={(e) => setSeasonFilter(e.target.value)}
+              className="bg-panel2 border border-line rounded-md px-3 py-2 text-sm focus:border-red outline-none"
+            >
+              <option value="all">All seasons</option>
+              {seasons.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          )}
+          <button
+            onClick={() => window.print()}
+            className="bg-panel2 border border-line text-chalk font-medium text-sm rounded-md px-4 py-2 hover:border-red shrink-0"
+          >
+            Print report
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
@@ -474,6 +532,7 @@ export default function ScoutingReport({
           matchupPlan={matchupPlan}
           opponentRoster={opponentRoster}
           myTeamRoster={myTeamRoster}
+          seasonLabel={seasonFilter && seasonFilter !== 'all' ? seasonFilter : 'All seasons'}
         />
       </div>
     </div>
@@ -580,6 +639,7 @@ function PrintableReport({
   matchupPlan,
   opponentRoster,
   myTeamRoster,
+  seasonLabel,
 }) {
   const today = new Date().toLocaleDateString(undefined, {
     year: 'numeric',
@@ -617,6 +677,7 @@ function PrintableReport({
           <p className="font-semibold text-black">Scouting Report</p>
           <p>{today}</p>
           <p>{summary.gamesWithStats} game{summary.gamesWithStats === 1 ? '' : 's'} tracked</p>
+          <p>{seasonLabel}</p>
         </div>
       </div>
 
