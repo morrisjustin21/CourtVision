@@ -11,78 +11,35 @@ const LINKS = [
   { key: 'automation', label: 'Automation' },
 ]
 
+const DEFAULT_SEASONS = ['2026-27', '2025-26']
+
 function SeasonPill() {
   const { season, setSeason, loading } = useCurrentSeason()
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState('')
-  const [seasons, setSeasons] = useState([])
+  const [seasons, setSeasons] = useState(DEFAULT_SEASONS)
 
   useEffect(() => {
     async function loadSeasons() {
       const { data } = await supabase.from('games').select('season').not('season', 'is', null)
-      const distinct = [...new Set((data || []).map((g) => g.season))].sort().reverse()
-      setSeasons(distinct)
+      const distinct = new Set([...DEFAULT_SEASONS, ...(data || []).map((g) => g.season)])
+      setSeasons([...distinct].sort().reverse())
     }
     loadSeasons()
   }, [])
 
   if (loading) return null
 
-  if (editing) {
-    return (
-      <div className="px-5 pb-4">
-        <input
-          autoFocus
-          list="nav-season-suggestions"
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && draft.trim()) {
-              setSeason(draft.trim())
-              setEditing(false)
-            }
-            if (e.key === 'Escape') setEditing(false)
-          }}
-          placeholder="2026-27"
-          className="w-full bg-panel2 border border-red rounded-md px-2.5 py-1.5 text-sm focus:outline-none"
-        />
-        <datalist id="nav-season-suggestions">
-          {seasons.map((s) => (
-            <option key={s} value={s} />
-          ))}
-        </datalist>
-        <div className="flex gap-2 mt-1.5">
-          <button
-            onClick={() => {
-              if (draft.trim()) setSeason(draft.trim())
-              setEditing(false)
-            }}
-            className="text-xs bg-red text-white font-semibold rounded px-2.5 py-1"
-          >
-            Set
-          </button>
-          <button onClick={() => setEditing(false)} className="text-xs text-chalkdim hover:text-chalk">
-            Cancel
-          </button>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className="px-5 pb-4">
-      <button
-        onClick={() => {
-          setDraft(season || '')
-          setEditing(true)
-        }}
-        className="w-full flex items-center justify-between bg-panel2 border border-line hover:border-red rounded-full px-3 py-1.5 text-xs font-semibold"
+      <select
+        value={season || ''}
+        onChange={(e) => setSeason(e.target.value)}
+        className="w-full bg-panel2 border border-line hover:border-red rounded-full px-3 py-1.5 text-xs font-semibold text-chalk focus:outline-none focus:border-red cursor-pointer"
       >
-        <span className={season ? 'text-chalk' : 'text-chalkdim'}>
-          {season || 'Set current season'}
-        </span>
-        <span className="text-chalkdim">▾</span>
-      </button>
+        <option value="" disabled>Set current season</option>
+        {seasons.map((s) => (
+          <option key={s} value={s}>{s}</option>
+        ))}
+      </select>
     </div>
   )
 }
