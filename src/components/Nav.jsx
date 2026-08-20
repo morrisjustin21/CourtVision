@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { useCurrentSeason } from '../useCurrentSeason'
+import Logo from './Logo'
 
 const LINKS = [
   { key: 'teams', label: 'Teams' },
@@ -88,18 +89,8 @@ function SeasonPill() {
 export default function Nav({ view, setView }) {
   return (
     <div className="w-full md:w-56 shrink-0 border-b md:border-b-0 md:border-r border-line bg-panel print:hidden">
-      <div className="px-5 py-5 flex items-center gap-2">
-        <svg width="18" height="18" viewBox="0 0 18 18" className="text-red shrink-0">
-          <circle cx="9" cy="9" r="6.5" stroke="currentColor" strokeWidth="1.4" fill="none" />
-          <line x1="9" y1="0.5" x2="9" y2="3.5" stroke="currentColor" strokeWidth="1.4" />
-          <line x1="9" y1="14.5" x2="9" y2="17.5" stroke="currentColor" strokeWidth="1.4" />
-          <line x1="0.5" y1="9" x2="3.5" y2="9" stroke="currentColor" strokeWidth="1.4" />
-          <line x1="14.5" y1="9" x2="17.5" y2="9" stroke="currentColor" strokeWidth="1.4" />
-          <circle cx="9" cy="9" r="1.3" fill="currentColor" />
-        </svg>
-        <span className="font-display text-2xl font-bold tracking-tight">
-          COURT<span className="text-red">VISION</span>
-        </span>
+      <div className="px-5 pt-6 pb-5 flex justify-center">
+        <Logo scale={0.8} />
       </div>
 
       <SeasonPill />
