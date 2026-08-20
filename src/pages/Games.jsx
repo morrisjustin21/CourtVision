@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
+import { useCurrentSeason } from '../useCurrentSeason'
 
 const STAT_FIELDS = [
   { key: 'points', label: 'PTS' },
@@ -205,7 +206,8 @@ export default function Games() {
   const [loading, setLoading] = useState(true)
   const [showNewGame, setShowNewGame] = useState(false)
   const [selectedGame, setSelectedGame] = useState(null)
-  const [seasonFilter, setSeasonFilter] = useState('all')
+  const [seasonFilter, setSeasonFilter] = useState(null)
+  const { season: currentSeason, loading: seasonLoading } = useCurrentSeason()
 
   async function loadAll() {
     setLoading(true)
@@ -225,8 +227,15 @@ export default function Games() {
     loadAll()
   }, [])
 
+  useEffect(() => {
+    if (!seasonLoading && seasonFilter === null) {
+      setSeasonFilter(currentSeason || 'all')
+    }
+  }, [seasonLoading, currentSeason, seasonFilter])
+
   const seasons = [...new Set(games.map((g) => g.season).filter(Boolean))].sort().reverse()
-  const filteredGames = seasonFilter === 'all' ? games : games.filter((g) => g.season === seasonFilter)
+  const filteredGames =
+    !seasonFilter || seasonFilter === 'all' ? games : games.filter((g) => g.season === seasonFilter)
 
   if (selectedGame) {
     return (
@@ -247,7 +256,7 @@ export default function Games() {
         <div className="flex items-center gap-2">
           {seasons.length > 0 && (
             <select
-              value={seasonFilter}
+              value={seasonFilter || 'all'}
               onChange={(e) => setSeasonFilter(e.target.value)}
               className="bg-panel2 border border-line rounded-md px-3 py-2 text-sm focus:border-red outline-none"
             >
