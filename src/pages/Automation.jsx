@@ -41,12 +41,16 @@ export default function Automation() {
 
   if (loading) return <p className="text-chalkdim">Loading…</p>
 
+  const scoreReviews = reviews.filter((r) => r.entry_type === 'score')
+  const scheduleReviews = reviews.filter((r) => r.entry_type === 'schedule')
+
   return (
     <div>
       <h1 className="font-display text-4xl font-bold mb-1">Automation</h1>
       <p className="text-chalkdim text-sm mb-6">
-        Automatically check tracked teams' OSSAA schedule pages once a day and flag newly completed
-        games for your review — nothing gets added to your records without your approval.
+        Automatically check tracked teams' OSSAA schedule pages once a day — new upcoming games get
+        added to the schedule, and completed games get flagged with a score. Nothing gets added to
+        your records without your approval.
       </p>
 
       <div className="bg-panel border border-line rounded-lg p-5 mb-8 flex items-center justify-between">
@@ -98,15 +102,30 @@ export default function Automation() {
       )}
 
       <h3 className="font-display text-xl font-semibold text-chalkdim uppercase tracking-wide text-sm mb-3">
-        Pending score reviews ({reviews.length})
+        Pending schedule updates ({scheduleReviews.length})
       </h3>
-      {reviews.length === 0 ? (
+      {scheduleReviews.length === 0 ? (
+        <div className="border border-dashed border-line rounded-lg p-6 text-center text-chalkdim text-sm mb-8">
+          Nothing waiting for review right now.
+        </div>
+      ) : (
+        <div className="space-y-3 mb-8">
+          {scheduleReviews.map((review) => (
+            <ReviewCard key={review.id} review={review} allTeams={allTeams} onResolved={loadAll} />
+          ))}
+        </div>
+      )}
+
+      <h3 className="font-display text-xl font-semibold text-chalkdim uppercase tracking-wide text-sm mb-3">
+        Pending score reviews ({scoreReviews.length})
+      </h3>
+      {scoreReviews.length === 0 ? (
         <div className="border border-dashed border-line rounded-lg p-6 text-center text-chalkdim text-sm">
           Nothing waiting for review right now.
         </div>
       ) : (
         <div className="space-y-3">
-          {reviews.map((review) => (
+          {scoreReviews.map((review) => (
             <ReviewCard key={review.id} review={review} allTeams={allTeams} onResolved={loadAll} />
           ))}
         </div>
@@ -137,8 +156,9 @@ function ReviewCard({ review, allTeams, onResolved }) {
 
     const homeTeamId = review.is_home ? review.team_id : opponentTeamId
     const awayTeamId = review.is_home ? opponentTeamId : review.team_id
-    const homeScore = review.is_home ? review.team_score : review.opponent_score
-    const awayScore = review.is_home ? review.opponent_score : review.team_score
+    const isScore = review.entry_type === 'score'
+    const homeScore = isScore ? (review.is_home ? review.team_score : review.opponent_score) : null
+    const awayScore = isScore ? (review.is_home ? review.opponent_score : review.team_score) : null
 
     // Look for an existing game already logged for this matchup and date.
     const { data: existing } = await supabase
@@ -152,7 +172,11 @@ function ReviewCard({ review, allTeams, onResolved }) {
 
     let gameId = existing?.id
     if (gameId) {
-      await supabase.from('games').update({ home_score: homeScore, away_score: awayScore }).eq('id', gameId)
+      if (isScore) {
+        await supabase.from('games').update({ home_score: homeScore, away_score: awayScore }).eq('id', gameId)
+      }
+      // If it's a schedule entry and the game already exists, there's nothing more to do —
+      // it's already on the schedule.
     } else {
       const { data: created } = await supabase
         .from('games')
@@ -190,12 +214,16 @@ function ReviewCard({ review, allTeams, onResolved }) {
         {review.team?.name} {review.is_home ? 'vs' : '@'} {review.opponent_raw}
         <span className="text-chalkdim text-sm font-normal"> · {review.game_date}</span>
       </p>
-      <p className="text-sm mb-3">
-        <span className="text-red font-semibold stat-figure">
-          {review.team_score}-{review.opponent_score}
-        </span>{' '}
-        <span className="text-chalkdim">{review.result === 'W' ? 'Win' : 'Loss'}</span>
-      </p>
+      {review.entry_type === 'score' ? (
+        <p className="text-sm mb-3">
+          <span className="text-red font-semibold stat-figure">
+            {review.team_score}-{review.opponent_score}
+          </span>{' '}
+          <span className="text-chalkdim">{review.result === 'W' ? 'Win' : 'Loss'}</span>
+        </p>
+      ) : (
+        <p className="text-sm text-chalkdim mb-3">New game on the schedule — no score yet.</p>
+      )}
 
       {!opponentTeamId && !creatingTeam && (
         <div className="mb-3">
