@@ -118,6 +118,7 @@ function TeamForm({ team, onCancel, onSaved }) {
   const [league, setLeague] = useState(team?.league || '')
   const [division, setDivision] = useState(team?.division || '')
   const [isMyTeam, setIsMyTeam] = useState(team?.is_my_team || false)
+  const [ossaaScheduleUrl, setOssaaScheduleUrl] = useState(team?.ossaa_schedule_url || '')
   const [saving, setSaving] = useState(false)
 
   async function handleSubmit(e) {
@@ -128,6 +129,7 @@ function TeamForm({ team, onCancel, onSaved }) {
       league: league || null,
       division: division || null,
       is_my_team: isMyTeam,
+      ossaa_schedule_url: ossaaScheduleUrl || null,
     }
     let result
     if (team) {
@@ -170,6 +172,20 @@ function TeamForm({ team, onCancel, onSaved }) {
           onChange={(e) => setDivision(e.target.value)}
           className="w-full bg-panel2 border border-line rounded-md px-3 py-2 focus:border-red outline-none"
         />
+      </div>
+      <div className="sm:col-span-2">
+        <label className="block text-xs uppercase tracking-wide text-chalkdim mb-1.5">
+          OSSAA schedule URL (optional)
+        </label>
+        <input
+          value={ossaaScheduleUrl}
+          onChange={(e) => setOssaaScheduleUrl(e.target.value)}
+          className="w-full bg-panel2 border border-line rounded-md px-3 py-2 focus:border-red outline-none"
+          placeholder="https://ossaarankings.com/Default.aspx?sel=ssch&sc=188&t=182360"
+        />
+        <p className="text-xs text-chalkdim mt-1">
+          If set, this team's results are checked automatically once a day (see the Automation page).
+        </p>
       </div>
       <label className="flex items-center gap-2 text-sm text-chalkdim sm:col-span-2">
         <input type="checkbox" checked={isMyTeam} onChange={(e) => setIsMyTeam(e.target.checked)} />
