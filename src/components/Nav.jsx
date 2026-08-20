@@ -4,6 +4,7 @@ const LINKS = [
   { key: 'teams', label: 'Teams' },
   { key: 'games', label: 'Games' },
   { key: 'stats', label: 'Leaders' },
+  { key: 'automation', label: 'Automation' },
 ]
 
 export default function Nav({ view, setView }) {
