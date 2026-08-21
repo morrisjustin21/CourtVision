@@ -308,6 +308,9 @@ export default function ScoutingReport({
   if (summary.gamesWithStats === 0) {
     return (
       <div>
+        {team.logo_url && (
+          <img src={team.logo_url} alt="" className="w-14 h-14 rounded-lg object-contain mb-4" />
+        )}
         {seasons.length > 0 && (
           <div className="flex justify-end mb-4">
             <select
@@ -365,6 +368,9 @@ export default function ScoutingReport({
   return (
     <div>
       <div className="print:hidden">
+      {team.logo_url && (
+        <img src={team.logo_url} alt="" className="w-14 h-14 rounded-lg object-contain mb-4" />
+      )}
       <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
         <p className="text-chalkdim text-sm">
           Based on {summary.gamesWithStats} game{summary.gamesWithStats === 1 ? '' : 's'} with stats entered.
@@ -665,13 +671,18 @@ function PrintableReport({
   return (
     <div className="text-black text-sm">
       <div className="flex items-baseline justify-between border-b-2 border-red pb-2 mb-3">
-        <div>
-          <h1 className="font-display text-3xl font-bold text-black leading-tight">
-            {team.name}
-          </h1>
-          <p className="text-xs text-gray-500">
-            {[team.league, team.division].filter(Boolean).join(' · ') || 'Scouting report'}
-          </p>
+        <div className="flex items-center gap-3">
+          {team.logo_url && (
+            <img src={team.logo_url} alt="" className="w-12 h-12 object-contain" />
+          )}
+          <div>
+            <h1 className="font-display text-3xl font-bold text-black leading-tight">
+              {team.name}
+            </h1>
+            <p className="text-xs text-gray-500">
+              {[team.league, team.division].filter(Boolean).join(' · ') || 'Scouting report'}
+            </p>
+          </div>
         </div>
         <div className="text-right text-xs text-gray-500">
           <p className="font-semibold text-black">Scouting Report</p>
