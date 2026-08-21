@@ -150,44 +150,74 @@ export default function Teams() {
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {visibleTeams.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setSelectedTeam(t)}
-              className="text-left bg-panel border border-line rounded-lg p-5 hover:border-red transition group"
-            >
-              <div className="flex items-center justify-between mb-3">
-                <span
-                  className="w-3 h-3 rounded-full"
-                  style={{ backgroundColor: t.color || '#E31B23' }}
-                />
-                {t.is_my_team && (
-                  <span className="text-[10px] uppercase tracking-wide text-red border border-red/40 rounded-full px-2 py-0.5">
-                    My team
-                  </span>
-                )}
-              </div>
-              <h3 className="font-display text-2xl font-semibold group-hover:text-red transition">
-                {t.name}
-              </h3>
-              <p className="text-chalkdim text-sm mt-1">
-                {[t.league, t.division].filter(Boolean).join(' · ') || 'No league set'}
-              </p>
-            </button>
-          ))}
-        </div>
+        <DistrictGroups teams={visibleTeams} onSelect={setSelectedTeam} />
       )}
     </div>
   )
 }
 
-// Used for both creating a new team and editing an existing one.
-// Pass `team` to edit; omit it to create.
+function DistrictGroups({ teams, onSelect }) {
+  const groups = {}
+  teams.forEach((t) => {
+    const key = t.district?.trim() || 'No district set'
+    if (!groups[key]) groups[key] = []
+    groups[key].push(t)
+  })
+  const districtNames = Object.keys(groups).sort((a, b) => {
+    if (a === 'No district set') return 1
+    if (b === 'No district set') return -1
+    return a.localeCompare(b, undefined, { numeric: true })
+  })
+
+  return (
+    <div className="space-y-8">
+      {districtNames.map((district) => (
+        <div key={district}>
+          <h2 className="font-display text-xl font-semibold text-chalkdim uppercase tracking-wide text-sm mb-3">
+            {district}
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {groups[district].map((t) => (
+              <TeamCard key={t.id} team={t} onSelect={onSelect} />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function TeamCard({ team: t, onSelect }) {
+  return (
+    <button
+      onClick={() => onSelect(t)}
+      className="text-left bg-panel border border-line rounded-lg p-5 hover:border-red transition group"
+    >
+      <div className="flex items-center justify-between mb-3">
+        <span
+          className="w-3 h-3 rounded-full"
+          style={{ backgroundColor: t.color || '#E31B23' }}
+        />
+        {t.is_my_team && (
+          <span className="text-[10px] uppercase tracking-wide text-red border border-red/40 rounded-full px-2 py-0.5">
+            My team
+          </span>
+        )}
+      </div>
+      <h3 className="font-display text-2xl font-semibold group-hover:text-red transition">
+        {t.name}
+      </h3>
+      <p className="text-chalkdim text-sm mt-1">
+        {[t.league, t.division].filter(Boolean).join(' · ') || 'No league set'}
+      </p>
+    </button>
+  )
+}
 function TeamForm({ team, onCancel, onSaved }) {
   const [name, setName] = useState(team?.name || '')
   const [league, setLeague] = useState(team?.league || '')
   const [division, setDivision] = useState(team?.division || '')
+  const [district, setDistrict] = useState(team?.district || '')
   const [isMyTeam, setIsMyTeam] = useState(team?.is_my_team || false)
   const [ossaaScheduleUrl, setOssaaScheduleUrl] = useState(team?.ossaa_schedule_url || '')
   const [saving, setSaving] = useState(false)
@@ -199,6 +229,7 @@ function TeamForm({ team, onCancel, onSaved }) {
       name,
       league: league || null,
       division: division || null,
+      district: district || null,
       is_my_team: isMyTeam,
       ossaa_schedule_url: ossaaScheduleUrl || null,
     }
@@ -242,6 +273,15 @@ function TeamForm({ team, onCancel, onSaved }) {
           value={division}
           onChange={(e) => setDivision(e.target.value)}
           className="w-full bg-panel2 border border-line rounded-md px-3 py-2 focus:border-red outline-none"
+        />
+      </div>
+      <div>
+        <label className="block text-xs uppercase tracking-wide text-chalkdim mb-1.5">District</label>
+        <input
+          value={district}
+          onChange={(e) => setDistrict(e.target.value)}
+          className="w-full bg-panel2 border border-line rounded-md px-3 py-2 focus:border-red outline-none"
+          placeholder="District 2"
         />
       </div>
       <div className="sm:col-span-2">
