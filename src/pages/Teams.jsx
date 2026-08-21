@@ -3,6 +3,7 @@ import { supabase } from '../supabaseClient'
 import ScoutingReport from './ScoutingReport'
 import PlayerDevelopment from './PlayerDevelopment'
 import AdditionalStats from './AdditionalStats'
+import TeamSchedule from './TeamSchedule'
 import { useCurrentSeason } from '../useCurrentSeason'
 
 const MATCHUP_SLOTS = 5
@@ -595,6 +596,7 @@ function TeamDetail({ team, onBack, onTeamUpdated }) {
         <div className="flex gap-1 bg-panel border border-line rounded-md p-1 mb-6 w-fit print:hidden">
           {[
             { key: 'roster', label: 'Roster' },
+            { key: 'schedule', label: 'Schedule' },
             { key: 'scouting', label: 'Scouting Report' },
             { key: 'additional', label: 'Additional Stats' },
           ].map((t) => (
@@ -634,6 +636,8 @@ function TeamDetail({ team, onBack, onTeamUpdated }) {
           matchupSavedAt={matchupSavedAt}
         />
       )}
+
+      {tab === 'schedule' && !showEditTeam && <TeamSchedule team={team} />}
 
       {tab === 'additional' && !showEditTeam && <AdditionalStats team={team} />}
 
