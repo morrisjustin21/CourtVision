@@ -149,3 +149,159 @@ export function generateInsights(summary, shotAgg = {}) {
 
   return insights
 }
+
+// --- Team-level scouting insights ---
+// Same philosophy as generateInsights, but framed for game-planning against
+// an opponent: strengths are things to respect and defend carefully;
+// weaknesses are framed as concrete ways to attack them.
+
+const TEAM_MIN_GAMES = 3
+const TEAM_MIN_ZONE_ATTEMPTS = 8
+const TEAM_MIN_FGA = 40
+const TEAM_MIN_FTA = 20
+
+// teamSummary: { games, totalPoints, totalRebounds, totalOreb, totalAssists,
+//   totalTurnovers, totalFtMade, totalFta, totalFga, totalThreeMade, totalThreeAtt }
+// shotAgg: { [zoneId]: { made, attempted } } — the team's combined shot chart
+export function generateTeamInsights(teamSummary, shotAgg = {}) {
+  const strengths = []
+  const weaknesses = []
+  if (!teamSummary || teamSummary.games < TEAM_MIN_GAMES) return { strengths, weaknesses }
+
+  const {
+    games, totalRebounds = 0, totalOreb = 0, totalAssists = 0, totalTurnovers = 0,
+    totalFtMade = 0, totalFta = 0, totalFga = 0, totalThreeMade = 0, totalThreeAtt = 0,
+  } = teamSummary
+
+  // --- Shot selection: long twos ---
+  const closeTwos = sumZones(shotAgg, [...CLOSE_2_ZONES])
+  const longTwos = sumZones(shotAgg, [...LONG_2_ZONES])
+  const totalTwoAtt = closeTwos.attempted + longTwos.attempted
+  if (totalTwoAtt >= TEAM_MIN_ZONE_ATTEMPTS && longTwos.attempted >= TEAM_MIN_ZONE_ATTEMPTS) {
+    const longTwoShare = longTwos.attempted / totalTwoAtt
+    const longTwoPct = (longTwos.made / longTwos.attempted) * 100
+    if (longTwoShare >= 0.4 && longTwoPct < 38) {
+      weaknesses.push({
+        title: 'Relies on the long two-pointer',
+        detail: `${(longTwoShare * 100).toFixed(0)}% of two-point attempts are mid-range/elbow shots, made at only ${longTwoPct.toFixed(0)}%. Live with that shot rather than over-helping — it's the lowest-value look in the game.`,
+      })
+    }
+  }
+
+  // --- Cold and hot zones (team-wide) ---
+  Object.entries(shotAgg).forEach(([zoneId, stat]) => {
+    if (!stat || stat.attempted < TEAM_MIN_ZONE_ATTEMPTS) return
+    const zonePct = (stat.made / stat.attempted) * 100
+    const isThree = ['left_corner_3', 'top_key_3', 'deep_3', 'right_corner_3'].includes(zoneId)
+    const coldThreshold = isThree ? 28 : 40
+    const hotThreshold = isThree ? 38 : 55
+    if (zonePct < coldThreshold) {
+      weaknesses.push({
+        title: `Cold as a team from ${ZONE_LABELS[zoneId] || zoneId}`,
+        detail: `${stat.made}/${stat.attempted} (${zonePct.toFixed(0)}%) from this spot as a team. Real volume, low efficiency — funnel the defense to force shots from here.`,
+      })
+    } else if (zonePct >= hotThreshold) {
+      strengths.push({
+        title: `Efficient from ${ZONE_LABELS[zoneId] || zoneId}`,
+        detail: `${stat.made}/${stat.attempted} (${zonePct.toFixed(0)}%) from this spot. Contest hard here — don't help off shooters in this area.`,
+      })
+    }
+  })
+
+  // --- Three-point volume vs. efficiency ---
+  if (totalThreeAtt >= TEAM_MIN_ZONE_ATTEMPTS && totalFga >= TEAM_MIN_FGA) {
+    const threeShare = totalThreeAtt / totalFga
+    const threePct = (totalThreeMade / totalThreeAtt) * 100
+    if (threeShare >= 0.3 && threePct < 28) {
+      weaknesses.push({
+        title: 'High three-point volume, low team efficiency',
+        detail: `Threes make up ${(threeShare * 100).toFixed(0)}% of shot attempts but only fall at ${threePct.toFixed(0)}% as a team. Live with the outside shot — don't collapse the defense to take it away.`,
+      })
+    } else if (threeShare >= 0.3 && threePct >= 36) {
+      strengths.push({
+        title: 'High-volume, efficient three-point shooting team',
+        detail: `Threes make up ${(threeShare * 100).toFixed(0)}% of shot attempts and fall at ${threePct.toFixed(0)}%. Closeouts need to be hard and under control — don't give up easy corner or wing threes.`,
+      })
+    }
+  }
+
+  // --- Team turnover rate ---
+  const topg = totalTurnovers / games
+  if (topg >= 15) {
+    weaknesses.push({
+      title: 'High team turnover rate',
+      detail: `Averaging ${topg.toFixed(1)} turnovers per game. Full-court pressure and passing-lane denial are likely to pay off against this team.`,
+    })
+  } else if (topg < 10 && games >= TEAM_MIN_GAMES) {
+    strengths.push({
+      title: 'Takes care of the basketball',
+      detail: `Only ${topg.toFixed(1)} turnovers per game. Gambling for steals is unlikely to pay off — sound, disciplined half-court defense is the better approach.`,
+    })
+  }
+
+  // --- Team free throw shooting ---
+  if (totalFta >= TEAM_MIN_FTA) {
+    const ftPct = (totalFtMade / totalFta) * 100
+    if (ftPct < 65) {
+      weaknesses.push({
+        title: 'Poor free-throw shooting team',
+        detail: `${totalFtMade}/${totalFta} (${ftPct.toFixed(0)}%) at the line as a team. Fouling late in a close game is a defensible strategy against this team.`,
+      })
+    } else if (ftPct >= 75) {
+      strengths.push({
+        title: 'Reliable free-throw shooting team',
+        detail: `${totalFtMade}/${totalFta} (${ftPct.toFixed(0)}%) at the line as a team. Avoid unnecessary fouls, especially in the final minutes — they'll convert.`,
+      })
+    }
+  }
+
+  // --- Free throw rate (how often they get to the line as a team) ---
+  if (totalFga >= TEAM_MIN_FGA) {
+    const ftRate = totalFta / totalFga
+    if (ftRate < 0.2) {
+      weaknesses.push({
+        title: "Doesn't attack the rim much as a team",
+        detail: `Only ${(ftRate * 100).toFixed(0)} free throw attempts per 100 shots attempted. This is a perimeter-oriented team — contest jump shots without needing to worry heavily about penetration fouls.`,
+      })
+    } else if (ftRate >= 0.35) {
+      strengths.push({
+        title: 'Attacks the rim and draws fouls',
+        detail: `${(ftRate * 100).toFixed(0)} free throw attempts per 100 shots attempted. Defend the paint without reaching — taking a charge is safer than gambling for a steal against this team.`,
+      })
+    }
+  }
+
+  // --- Ball movement / security ---
+  const astToRatio = totalTurnovers ? totalAssists / totalTurnovers : null
+  if (astToRatio != null && totalTurnovers >= 10) {
+    if (astToRatio < 1.0) {
+      weaknesses.push({
+        title: 'Ball movement/security is a weakness',
+        detail: `Assist-to-turnover ratio of ${astToRatio.toFixed(2)}. Pressuring the ball and denying easy passing lanes is likely to disrupt this team's offense.`,
+      })
+    } else if (astToRatio >= 1.8) {
+      strengths.push({
+        title: 'Moves the ball well',
+        detail: `Assist-to-turnover ratio of ${astToRatio.toFixed(2)}. Help defense needs to be sound and rotate quickly — this team will find the open man.`,
+      })
+    }
+  }
+
+  // --- Offensive rebounding tendency ---
+  if (totalRebounds >= 30) {
+    const orebShare = totalOreb / totalRebounds
+    if (orebShare < 0.2) {
+      weaknesses.push({
+        title: "Doesn't crash the offensive glass",
+        detail: `Offensive rebounds make up only ${(orebShare * 100).toFixed(0)}% of this team's total rebounds. Getting out in transition after a defensive stop is unlikely to be punished by second-chance points.`,
+      })
+    } else if (orebShare >= 0.35) {
+      strengths.push({
+        title: 'Crashes the offensive glass hard',
+        detail: `Offensive rebounds make up ${(orebShare * 100).toFixed(0)}% of this team's total rebounds. Boxing out on every possession needs to be a priority to avoid second-chance points.`,
+      })
+    }
+  }
+
+  return { strengths, weaknesses }
+}
