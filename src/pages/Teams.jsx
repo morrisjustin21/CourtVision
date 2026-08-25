@@ -600,7 +600,7 @@ function TeamDetail({ team, onBack, onTeamUpdated }) {
             { key: 'schedule', label: 'Schedule' },
             { key: 'scouting', label: 'Scouting Report' },
             { key: 'shotcharts', label: 'Shot Charts' },
-            { key: 'additional', label: 'Additional Stats' },
+            { key: 'additional', label: 'Tendencies' },
           ].map((t) => (
             <button
               key={t.key}
