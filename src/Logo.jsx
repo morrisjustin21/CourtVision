@@ -4,7 +4,7 @@
 // let it breathe (the login screen).
 export default function Logo({ scale = 1, className = '' }) {
   const netWidth = 56 * scale
-  const netHeight = netWidth * (73 / 90)
+  const netHeight = netWidth * (63 / 90)
   const fontSize = 28 * scale
 
   return (
@@ -18,31 +18,32 @@ export default function Logo({ scale = 1, className = '' }) {
       <svg
         width={netWidth}
         height={netHeight}
-        viewBox="0 0 90 73"
+        viewBox="0 0 90 63"
         className="mt-1"
         role="img"
         aria-label="CourtVision"
       >
         <line x1="10" y1="8" x2="80" y2="8" stroke="#E31B23" strokeWidth="3.5" strokeLinecap="round" />
-        <line x1="10" y1="12" x2="45" y2="65" stroke="#E31B23" strokeWidth="2.5" strokeLinecap="round" />
-        <line x1="27.5" y1="12" x2="45" y2="65" stroke="#E31B23" strokeWidth="2.5" strokeLinecap="round" />
-        <line x1="45" y1="12" x2="45" y2="65" stroke="#E31B23" strokeWidth="2.5" strokeLinecap="round" />
-        <line x1="62.5" y1="12" x2="45" y2="65" stroke="#E31B23" strokeWidth="2.5" strokeLinecap="round" />
-        <line x1="80" y1="12" x2="45" y2="65" stroke="#E31B23" strokeWidth="2.5" strokeLinecap="round" />
+        <line x1="10" y1="8" x2="33.8" y2="58" stroke="#E31B23" strokeWidth="2.5" strokeLinecap="round" />
+        <line x1="27.5" y1="8" x2="39.4" y2="58" stroke="#E31B23" strokeWidth="2.5" strokeLinecap="round" />
+        <line x1="45" y1="8" x2="45" y2="58" stroke="#E31B23" strokeWidth="2.5" strokeLinecap="round" />
+        <line x1="62.5" y1="8" x2="50.6" y2="58" stroke="#E31B23" strokeWidth="2.5" strokeLinecap="round" />
+        <line x1="80" y1="8" x2="56.2" y2="58" stroke="#E31B23" strokeWidth="2.5" strokeLinecap="round" />
         <path
-          d="M22.25 30.55 L33.625 25.55 L45 30.55 L56.375 25.55 L67.75 30.55"
+          d="M19.52 23.5 L32.26 32.5 L45 23.5 L57.74 32.5 L70.48 23.5"
           fill="none"
           stroke="#E31B23"
           strokeWidth="2"
           strokeOpacity="0.85"
         />
         <path
-          d="M34.5 49.1 L39.75 46.1 L45 49.1 L50.25 46.1 L55.5 49.1"
+          d="M27.85 42.5 L36.42 48.5 L45 42.5 L53.58 48.5 L62.15 42.5"
           fill="none"
           stroke="#E31B23"
           strokeWidth="2"
           strokeOpacity="0.85"
         />
+        <ellipse cx="45" cy="58" rx="11.2" ry="2.2" fill="none" stroke="#E31B23" strokeWidth="2" />
       </svg>
     </div>
   )
