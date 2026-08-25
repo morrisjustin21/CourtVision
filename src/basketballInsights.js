@@ -7,7 +7,6 @@
 // not a verdict. Every rule requires a minimum sample size before firing,
 // so a single unlucky (or lucky) game can't produce a false flag.
 
-const MIN_GAMES = 3
 const MIN_ZONE_ATTEMPTS = 5
 const MIN_FGA_FOR_RATE_RULES = 15
 
@@ -48,7 +47,7 @@ const ZONE_LABELS = {
 // shotAgg: { [zoneId]: { made, attempted } } from the player's shot chart data
 export function generateInsights(summary, shotAgg = {}) {
   const insights = []
-  if (!summary || summary.games < MIN_GAMES) return insights
+  if (!summary || !summary.games) return insights
 
   const { games, totalFga = 0, totalFta = 0, totalFtMade = 0, totalThreeAtt = 0,
     totalThreeMade = 0, totalTurnovers = 0, totalAssists = 0, ppg, apg, mpg, rpg } = summary
@@ -155,7 +154,6 @@ export function generateInsights(summary, shotAgg = {}) {
 // an opponent: strengths are things to respect and defend carefully;
 // weaknesses are framed as concrete ways to attack them.
 
-const TEAM_MIN_GAMES = 3
 const TEAM_MIN_ZONE_ATTEMPTS = 8
 const TEAM_MIN_FGA = 40
 const TEAM_MIN_FTA = 20
@@ -166,7 +164,7 @@ const TEAM_MIN_FTA = 20
 export function generateTeamInsights(teamSummary, shotAgg = {}) {
   const strengths = []
   const weaknesses = []
-  if (!teamSummary || teamSummary.games < TEAM_MIN_GAMES) return { strengths, weaknesses }
+  if (!teamSummary || !teamSummary.games) return { strengths, weaknesses }
 
   const {
     games, totalRebounds = 0, totalOreb = 0, totalAssists = 0, totalTurnovers = 0,
@@ -232,7 +230,7 @@ export function generateTeamInsights(teamSummary, shotAgg = {}) {
       title: 'High team turnover rate',
       detail: `Averaging ${topg.toFixed(1)} turnovers per game. Full-court pressure and passing-lane denial are likely to pay off against this team.`,
     })
-  } else if (topg < 10 && games >= TEAM_MIN_GAMES) {
+  } else if (topg < 10) {
     strengths.push({
       title: 'Takes care of the basketball',
       detail: `Only ${topg.toFixed(1)} turnovers per game. Gambling for steals is unlikely to pay off — sound, disciplined half-court defense is the better approach.`,
