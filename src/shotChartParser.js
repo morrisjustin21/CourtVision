@@ -26,37 +26,35 @@ async function extractPageItems(page) {
   const viewport = page.getViewport({ scale: 1 })
   const textContent = await page.getTextContent()
 
-  // pdf.js reports raw text exactly as the PDF's content stream defines it,
-  // which for PDFs generated via print-to-PDF (as this report is) is often
-  // fragmented into much smaller pieces than whole words — sometimes down
-  // to individual characters. Convert each fragment into a positioned
-  // character/run first, then merge adjacent runs on the same line into
-  // real words (mirroring what a word-aware PDF text extractor does),
-  // before this parser's pattern matching ever sees the text.
-  const runs = textContent.items
-    .filter((item) => item.str && item.str.trim())
-    .map((item) => {
-      const x0 = item.transform[4]
-      const width = item.width || item.str.length * 5
-      const top = viewport.height - item.transform[5] - (item.height || 9)
-      return { text: item.str, x0, x1: x0 + width, top }
-    })
-    .sort((a, b) => a.top - b.top || a.x0 - b.x0)
-
+  // This report is generated via a browser's print-to-PDF, which — unlike
+  // the finer-grained text runs a PDF authoring tool would produce — often
+  // bundles an entire line of text (e.g. "#33 Kadyn Armstrong") into a
+  // single raw item. Split on whitespace and estimate each resulting
+  // word's x-position from its character offset within the original
+  // string, so a multi-word item still yields individually positioned,
+  // matchable tokens instead of one unusable blob.
   const words = []
-  let current = null
-  for (const run of runs) {
-    if (current && Math.abs(run.top - current.top) < 3 && run.x0 - current.x1 < 2.5) {
-      current.text += run.text
-      current.x1 = Math.max(current.x1, run.x1)
+  for (const item of textContent.items) {
+    if (!item.str || !item.str.trim()) continue
+    const x0 = item.transform[4]
+    const width = item.width || item.str.length * 5
+    const top = viewport.height - item.transform[5] - (item.height || 9)
+    const charWidth = item.str.length ? width / item.str.length : 0
+
+    if (/\s/.test(item.str.trim())) {
+      let charIndex = 0
+      for (const part of item.str.split(/(\s+)/)) {
+        if (part.trim()) {
+          words.push({ text: part.trim(), x0: x0 + charIndex * charWidth, top })
+        }
+        charIndex += part.length
+      }
     } else {
-      if (current) words.push(current)
-      current = { text: run.text, x0: run.x0, x1: run.x1, top: run.top }
+      words.push({ text: item.str.trim(), x0, top })
     }
   }
-  if (current) words.push(current)
 
-  return words.map((w) => ({ text: w.text.trim(), x0: w.x0, top: w.top })).filter((w) => w.text)
+  return words
 }
 
 // Parses a Hudl "Shot Chart Report" PDF into per-player zone data.
