@@ -107,26 +107,35 @@ const PALETTES = {
 }
 
 // Dark blue (ice cold) -> light blue -> light red -> bright red (hot). A
-// diverging scale rather than shades of one color, so low and high
-// percentages are distinguishable at a glance instead of all reading as
-// "some shade of red."
-const HEAT_STOPS = [
-  [0, [30, 64, 175]],
-  [35, [147, 197, 253]],
-  [65, [252, 165, 165]],
-  [100, [220, 38, 38]],
+// three-point shot and a two-point shot at the "same" percentage mean very
+// different things — 35% is a fine three-point rate but a poor two-point
+// rate — so each shot type gets its own scale rather than one universal
+// 0-100% gradient.
+const DEEP_BLUE = [30, 64, 175]
+const LIGHT_BLUE = [147, 197, 253]
+const LIGHT_RED = [252, 165, 165]
+const HOT_RED = [220, 38, 38]
+
+const THREE_PT_STOPS = [
+  [0, DEEP_BLUE], [20, DEEP_BLUE], [28, LIGHT_BLUE], [35, LIGHT_BLUE], [40, LIGHT_RED], [45, HOT_RED],
+]
+const TWO_PT_STOPS = [
+  [0, DEEP_BLUE], [30, DEEP_BLUE], [40, LIGHT_BLUE], [50, LIGHT_RED], [60, HOT_RED],
 ]
 
-function heatColor(pct) {
-  for (let i = 0; i < HEAT_STOPS.length - 1; i++) {
-    const [p0, c0] = HEAT_STOPS[i]
-    const [p1, c1] = HEAT_STOPS[i + 1]
+function heatColor(pct, zoneType) {
+  const stops = zoneType === '3PT' ? THREE_PT_STOPS : TWO_PT_STOPS
+  if (pct <= stops[0][0]) return stops[0][1]
+  if (pct >= stops[stops.length - 1][0]) return stops[stops.length - 1][1]
+  for (let i = 0; i < stops.length - 1; i++) {
+    const [p0, c0] = stops[i]
+    const [p1, c1] = stops[i + 1]
     if (pct >= p0 && pct <= p1) {
       const t = p1 !== p0 ? (pct - p0) / (p1 - p0) : 0
       return c0.map((c, j) => Math.round(c + (c1[j] - c) * t))
     }
   }
-  return pct > 100 ? HEAT_STOPS[HEAT_STOPS.length - 1][1] : HEAT_STOPS[0][1]
+  return stops[stops.length - 1][1]
 }
 
 // Picks readable text color (near-black or near-white) against a given
@@ -145,7 +154,7 @@ export function ShotChartSvg({ aggregated, variant = 'dark', className = '' }) {
       {SHOT_ZONES.map((zone) => {
         const stat = aggregated[zone.id] || { made: 0, attempted: 0 }
         const pct = stat.attempted > 0 ? (stat.made / stat.attempted) * 100 : null
-        const rgb = pct == null ? null : heatColor(pct)
+        const rgb = pct == null ? null : heatColor(pct, zone.type)
         const fill = rgb == null ? palette.empty : `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`
         const textColor = rgb == null ? palette.emptyText : textColorFor(rgb)
         const points = zone.points.map(([x, y]) => `${x},${y}`).join(' ')
