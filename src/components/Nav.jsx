@@ -29,52 +29,52 @@ function SeasonPill() {
   if (loading) return null
 
   return (
-    <div className="px-5 pb-4">
-      <select
-        value={season || ''}
-        onChange={(e) => setSeason(e.target.value)}
-        className="w-full bg-panel2 border border-line hover:border-red rounded-full px-3 py-1.5 text-xs font-semibold text-chalk focus:outline-none focus:border-red cursor-pointer"
-      >
-        <option value="" disabled>Set current season</option>
-        {seasons.map((s) => (
-          <option key={s} value={s}>{s}</option>
-        ))}
-      </select>
-    </div>
+    <select
+      value={season || ''}
+      onChange={(e) => setSeason(e.target.value)}
+      className="bg-panel2 border border-line hover:border-red rounded-full px-3 py-1.5 text-xs font-semibold text-chalk focus:outline-none focus:border-red cursor-pointer shrink-0"
+    >
+      <option value="" disabled>Set current season</option>
+      {seasons.map((s) => (
+        <option key={s} value={s}>{s}</option>
+      ))}
+    </select>
   )
 }
 
 export default function Nav({ view, setView }) {
   return (
-    <div className="w-full md:w-56 shrink-0 border-b md:border-b-0 md:border-r border-line bg-panel print:hidden">
-      <div className="px-5 pt-6 pb-5 flex justify-center">
-        <Logo scale={0.8} />
-      </div>
+    <div className="w-full border-b border-line bg-panel print:hidden">
+      <div className="max-w-7xl mx-auto px-5 md:px-8 py-3 flex items-center gap-4 flex-wrap">
+        <div className="shrink-0">
+          <Logo scale={0.55} />
+        </div>
 
-      <SeasonPill />
+        <nav className="flex items-center gap-1 overflow-x-auto flex-nowrap">
+          {LINKS.map((l) => (
+            <button
+              key={l.key}
+              onClick={() => setView(l.key)}
+              className={`whitespace-nowrap px-3 py-2 rounded-md text-sm font-medium transition ${
+                view === l.key
+                  ? 'bg-red text-white'
+                  : 'text-chalkdim hover:text-chalk hover:bg-panel2'
+              }`}
+            >
+              {l.label}
+            </button>
+          ))}
+        </nav>
 
-      <nav className="flex md:flex-col px-3 gap-1 pb-3 md:pb-0">
-        {LINKS.map((l) => (
+        <div className="flex items-center gap-3 ml-auto shrink-0">
+          <SeasonPill />
           <button
-            key={l.key}
-            onClick={() => setView(l.key)}
-            className={`text-left px-3 py-2 rounded-md text-sm font-medium transition ${
-              view === l.key
-                ? 'bg-red text-white'
-                : 'text-chalkdim hover:text-chalk hover:bg-panel2'
-            }`}
+            onClick={() => supabase.auth.signOut()}
+            className="text-xs text-chalkdim hover:text-chalk px-2 py-1"
           >
-            {l.label}
+            Sign out
           </button>
-        ))}
-      </nav>
-      <div className="hidden md:block absolute bottom-4 px-3 w-56">
-        <button
-          onClick={() => supabase.auth.signOut()}
-          className="text-xs text-chalkdim hover:text-chalk px-3 py-2"
-        >
-          Sign out
-        </button>
+        </div>
       </div>
     </div>
   )
