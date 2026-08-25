@@ -25,17 +25,38 @@ function clusterValues(values, tolerance) {
 async function extractPageItems(page) {
   const viewport = page.getViewport({ scale: 1 })
   const textContent = await page.getTextContent()
-  return textContent.items
+
+  // pdf.js reports raw text exactly as the PDF's content stream defines it,
+  // which for PDFs generated via print-to-PDF (as this report is) is often
+  // fragmented into much smaller pieces than whole words — sometimes down
+  // to individual characters. Convert each fragment into a positioned
+  // character/run first, then merge adjacent runs on the same line into
+  // real words (mirroring what a word-aware PDF text extractor does),
+  // before this parser's pattern matching ever sees the text.
+  const runs = textContent.items
     .filter((item) => item.str && item.str.trim())
     .map((item) => {
       const x0 = item.transform[4]
-      // pdf.js reports y from the bottom of the page; convert to a
-      // top-of-page measurement. Digits and "%" have no descenders, so
-      // using the item height as a stand-in for ascent is accurate for
-      // exactly the tokens this parser matches against.
+      const width = item.width || item.str.length * 5
       const top = viewport.height - item.transform[5] - (item.height || 9)
-      return { text: item.str.trim(), x0, top }
+      return { text: item.str, x0, x1: x0 + width, top }
     })
+    .sort((a, b) => a.top - b.top || a.x0 - b.x0)
+
+  const words = []
+  let current = null
+  for (const run of runs) {
+    if (current && Math.abs(run.top - current.top) < 3 && run.x0 - current.x1 < 2.5) {
+      current.text += run.text
+      current.x1 = Math.max(current.x1, run.x1)
+    } else {
+      if (current) words.push(current)
+      current = { text: run.text, x0: run.x0, x1: run.x1, top: run.top }
+    }
+  }
+  if (current) words.push(current)
+
+  return words.map((w) => ({ text: w.text.trim(), x0: w.x0, top: w.top })).filter((w) => w.text)
 }
 
 // Parses a Hudl "Shot Chart Report" PDF into per-player zone data.
