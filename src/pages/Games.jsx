@@ -764,7 +764,20 @@ function GameDetail({ game: initialGame, onBack }) {
     setShotChartSaved((p) => ({ ...p, [side]: false }))
     try {
       const players = await parseShotChartPdf(file)
+
+      if (players.length === 0) {
+        setShotChartError((p) => ({
+          ...p,
+          [side]: "Couldn't find any player shot data in that PDF. The file may be a different format than expected.",
+        }))
+        setShotChartImporting((p) => ({ ...p, [side]: false }))
+        return
+      }
+
       const unmatchedJerseys = []
+      const dbErrors = []
+      let savedCount = 0
+
       for (const p of players) {
         const player = roster.find((r) => r.jersey_number === p.jersey)
         if (!player) {
@@ -772,7 +785,7 @@ function GameDetail({ game: initialGame, onBack }) {
           continue
         }
         for (const z of p.zones) {
-          await supabase.from('player_shot_zones').upsert(
+          const { error } = await supabase.from('player_shot_zones').upsert(
             {
               game_id: game.id,
               player_id: player.id,
@@ -782,12 +795,32 @@ function GameDetail({ game: initialGame, onBack }) {
             },
             { onConflict: 'game_id,player_id,zone' }
           )
+          if (error) {
+            dbErrors.push(error.message)
+          } else {
+            savedCount += 1
+          }
         }
       }
+
       setShotChartUnmatched((p) => ({ ...p, [side]: unmatchedJerseys }))
-      setShotChartSaved((p) => ({ ...p, [side]: true }))
+
+      if (dbErrors.length > 0) {
+        const uniqueMessages = [...new Set(dbErrors)]
+        setShotChartError((p) => ({
+          ...p,
+          [side]: `Saved ${savedCount} of ${savedCount + dbErrors.length} zone entries. Errors: ${uniqueMessages.join('; ')}`,
+        }))
+      } else if (savedCount === 0) {
+        setShotChartError((p) => ({
+          ...p,
+          [side]: 'Players were found in the PDF, but none matched a jersey number on this roster.',
+        }))
+      } else {
+        setShotChartSaved((p) => ({ ...p, [side]: true }))
+      }
     } catch (err) {
-      setShotChartError((p) => ({ ...p, [side]: "Couldn't read that shot chart PDF." }))
+      setShotChartError((p) => ({ ...p, [side]: `Couldn't read that shot chart PDF: ${err.message || err}` }))
     }
     setShotChartImporting((p) => ({ ...p, [side]: false }))
   }
