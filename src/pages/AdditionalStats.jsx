@@ -100,10 +100,11 @@ export default function AdditionalStats({ team }) {
 
       {!isReady ? (
         <p className="text-chalkdim">Loading…</p>
-      ) : teamSummary.games < 3 ? (
+      ) : teamSummary.games === 0 ? (
         <div className="border border-dashed border-line rounded-lg p-10 text-center text-chalkdim">
-          Not enough games logged yet ({teamSummary.games} of 3 minimum) to generate insights for
-          {seasonFilter && seasonFilter !== 'all' ? ` ${seasonFilter}` : ''}.
+          No box scores logged yet for {team.name}
+          {seasonFilter && seasonFilter !== 'all' ? ` in ${seasonFilter}` : ''} — insights will
+          appear once stats are entered.
         </div>
       ) : strengths.length === 0 && weaknesses.length === 0 ? (
         <div className="border border-dashed border-line rounded-lg p-10 text-center text-chalkdim">
