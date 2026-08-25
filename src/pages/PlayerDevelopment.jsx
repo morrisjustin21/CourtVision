@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { useCurrentSeason } from '../useCurrentSeason'
+import { ShotChartSvg } from './ShotChart'
 
 function StatCard({ label, value, sub }) {
   return (
@@ -44,6 +45,35 @@ export default function PlayerDevelopment({ player, team, onBack, onPlayerUpdate
     }
     load()
   }, [player.id])
+
+  const [shotZoneRows, setShotZoneRows] = useState([])
+  const [shotLoading, setShotLoading] = useState(true)
+
+  useEffect(() => {
+    async function loadShots() {
+      setShotLoading(true)
+      const { data } = await supabase.from('player_shot_zones').select('*').eq('player_id', player.id)
+      setShotZoneRows(data || [])
+      setShotLoading(false)
+    }
+    loadShots()
+  }, [player.id])
+
+  const shotAgg = useMemo(() => {
+    const byZone = {}
+    shotZoneRows.forEach((r) => {
+      if (!byZone[r.zone]) byZone[r.zone] = { made: 0, attempted: 0 }
+      byZone[r.zone].made += r.made || 0
+      byZone[r.zone].attempted += r.attempted || 0
+    })
+    return byZone
+  }, [shotZoneRows])
+
+  const hasShotData = Object.values(shotAgg).some((z) => z.attempted > 0)
+  const shotTotals = Object.values(shotAgg).reduce(
+    (acc, z) => ({ made: acc.made + z.made, attempted: acc.attempted + z.attempted }),
+    { made: 0, attempted: 0 }
+  )
 
   useEffect(() => {
     if (!seasonLoading && seasonFilter === null) {
@@ -200,6 +230,29 @@ export default function PlayerDevelopment({ player, team, onBack, onPlayerUpdate
       )}
 
       <h3 className="font-display text-xl font-semibold text-chalkdim uppercase tracking-wide text-sm mb-3">
+        Shot Chart
+      </h3>
+      <div className="mb-6">
+        {shotLoading ? (
+          <p className="text-chalkdim">Loading…</p>
+        ) : !hasShotData ? (
+          <div className="border border-dashed border-line rounded-lg p-8 text-center text-chalkdim text-sm">
+            No shot chart data imported yet for {player.name}. Import a Hudl shot chart PDF from any
+            game they play in to see their zone tendencies here.
+          </div>
+        ) : (
+          <div>
+            <p className="text-chalkdim text-sm mb-3">
+              {shotTotals.made}/{shotTotals.attempted} field goals (
+              {((shotTotals.made / shotTotals.attempted) * 100).toFixed(1)}%) across every zone-mapped
+              shot imported for {player.name}.
+            </p>
+            <ShotChartSvg aggregated={shotAgg} variant="dark" className="w-full max-w-sm mx-auto" />
+          </div>
+        )}
+      </div>
+
+      <h3 className="font-display text-xl font-semibold text-chalkdim uppercase tracking-wide text-sm mb-3">
         Strengths
       </h3>
       <textarea
@@ -247,13 +300,23 @@ export default function PlayerDevelopment({ player, team, onBack, onPlayerUpdate
       </div>
 
       <div className="hidden print:block">
-        <PrintablePlayerReport player={player} team={team} summary={summary} strengths={strengths} weaknesses={weaknesses} growthNotes={growthNotes} />
+        <PrintablePlayerReport
+          player={player}
+          team={team}
+          summary={summary}
+          strengths={strengths}
+          weaknesses={weaknesses}
+          growthNotes={growthNotes}
+          hasShotData={hasShotData}
+          shotAgg={shotAgg}
+          shotTotals={shotTotals}
+        />
       </div>
     </div>
   )
 }
 
-function PrintablePlayerReport({ player, team, summary, strengths, weaknesses, growthNotes }) {
+function PrintablePlayerReport({ player, team, summary, strengths, weaknesses, growthNotes, hasShotData, shotAgg, shotTotals }) {
   const today = new Date().toLocaleDateString(undefined, {
     year: 'numeric',
     month: 'long',
@@ -300,6 +363,12 @@ function PrintablePlayerReport({ player, team, summary, strengths, weaknesses, g
             <div>{row('FT%', fmtPct(summary.ftPct))}</div>
           </div>
         </>
+      )}
+
+      {hasShotData && (
+        <div className="mb-4 flex justify-center">
+          <ShotChartSvg aggregated={shotAgg} variant="light" className="w-full max-w-[220px]" />
+        </div>
       )}
 
       <div className="mb-4">
