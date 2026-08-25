@@ -102,8 +102,40 @@ export function usePlayerShotZoneData(team) {
 }
 
 const PALETTES = {
-  dark: { stroke: '#2B2E35', pctText: '#F5F5F3', fracText: '#9CA3AF', empty: 'rgba(255,255,255,0.03)' },
-  light: { stroke: '#D1D5DB', pctText: '#000000', fracText: '#6B7280', empty: 'rgba(0,0,0,0.02)' },
+  dark: { stroke: '#2B2E35', empty: 'rgba(255,255,255,0.03)', emptyText: '#F5F5F3' },
+  light: { stroke: '#D1D5DB', empty: 'rgba(0,0,0,0.02)', emptyText: '#000000' },
+}
+
+// Dark blue (ice cold) -> light blue -> light red -> bright red (hot). A
+// diverging scale rather than shades of one color, so low and high
+// percentages are distinguishable at a glance instead of all reading as
+// "some shade of red."
+const HEAT_STOPS = [
+  [0, [30, 64, 175]],
+  [35, [147, 197, 253]],
+  [65, [252, 165, 165]],
+  [100, [220, 38, 38]],
+]
+
+function heatColor(pct) {
+  for (let i = 0; i < HEAT_STOPS.length - 1; i++) {
+    const [p0, c0] = HEAT_STOPS[i]
+    const [p1, c1] = HEAT_STOPS[i + 1]
+    if (pct >= p0 && pct <= p1) {
+      const t = p1 !== p0 ? (pct - p0) / (p1 - p0) : 0
+      return c0.map((c, j) => Math.round(c + (c1[j] - c) * t))
+    }
+  }
+  return pct > 100 ? HEAT_STOPS[HEAT_STOPS.length - 1][1] : HEAT_STOPS[0][1]
+}
+
+// Picks readable text color (near-black or near-white) against a given
+// fill, since the heat map spans both light and dark, saturated fills
+// within the same chart — a single fixed text color per chart no longer
+// stays legible on every zone.
+function textColorFor([r, g, b]) {
+  const luminance = 0.299 * r + 0.587 * g + 0.114 * b
+  return luminance > 150 ? '#141416' : '#FFFFFF'
 }
 
 export function ShotChartSvg({ aggregated, variant = 'dark', className = '' }) {
@@ -113,7 +145,9 @@ export function ShotChartSvg({ aggregated, variant = 'dark', className = '' }) {
       {SHOT_ZONES.map((zone) => {
         const stat = aggregated[zone.id] || { made: 0, attempted: 0 }
         const pct = stat.attempted > 0 ? (stat.made / stat.attempted) * 100 : null
-        const fill = pct == null ? palette.empty : `rgba(227,27,35,${(0.15 + (pct / 100) * 0.7).toFixed(2)})`
+        const rgb = pct == null ? null : heatColor(pct)
+        const fill = rgb == null ? palette.empty : `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`
+        const textColor = rgb == null ? palette.emptyText : textColorFor(rgb)
         const points = zone.points.map(([x, y]) => `${x},${y}`).join(' ')
         const [cx, cy] = centroid(zone.points)
         return (
@@ -121,10 +155,10 @@ export function ShotChartSvg({ aggregated, variant = 'dark', className = '' }) {
             <polygon points={points} fill={fill} stroke={palette.stroke} strokeWidth="0.6" />
             {stat.attempted > 0 && (
               <>
-                <text x={cx} y={cy - 2.5} textAnchor="middle" fontSize="7.5" fontWeight="700" fill={palette.pctText}>
+                <text x={cx} y={cy - 2.5} textAnchor="middle" fontSize="7.5" fontWeight="700" fill={textColor}>
                   {pct.toFixed(0)}%
                 </text>
-                <text x={cx} y={cy + 5.5} textAnchor="middle" fontSize="5.5" fill={palette.fracText}>
+                <text x={cx} y={cy + 5.5} textAnchor="middle" fontSize="5.5" fill={textColor} fillOpacity="0.85">
                   {stat.made}/{stat.attempted}
                 </text>
               </>
