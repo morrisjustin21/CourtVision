@@ -4,6 +4,7 @@ import ScoutingReport from './ScoutingReport'
 import PlayerDevelopment from './PlayerDevelopment'
 import AdditionalStats from './AdditionalStats'
 import TeamSchedule from './TeamSchedule'
+import TeamShotCharts from './TeamShotCharts'
 import { useCurrentSeason } from '../useCurrentSeason'
 
 const MATCHUP_SLOTS = 5
@@ -598,6 +599,7 @@ function TeamDetail({ team, onBack, onTeamUpdated }) {
             { key: 'roster', label: 'Roster' },
             { key: 'schedule', label: 'Schedule' },
             { key: 'scouting', label: 'Scouting Report' },
+            { key: 'shotcharts', label: 'Shot Charts' },
             { key: 'additional', label: 'Additional Stats' },
           ].map((t) => (
             <button
@@ -638,6 +640,8 @@ function TeamDetail({ team, onBack, onTeamUpdated }) {
       )}
 
       {tab === 'schedule' && !showEditTeam && <TeamSchedule team={team} />}
+
+      {tab === 'shotcharts' && !showEditTeam && <TeamShotCharts team={team} />}
 
       {tab === 'additional' && !showEditTeam && <AdditionalStats team={team} />}
 
