@@ -60,18 +60,35 @@ async function extractPageItems(page) {
 }
 
 // Parses a Hudl "Shot Chart Report" PDF into per-player zone data.
-// Returns: [{ jersey, name, zones: [{ zoneId, type, made, attempted }] }]
+// Returns: { players: [{ jersey, name, zones }], debug: {...} } — the debug
+// object exists so a failed import can show exactly which stage produced
+// nothing, instead of a single opaque "didn't work."
 export async function parseShotChartPdf(file) {
   const arrayBuffer = await file.arrayBuffer()
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
 
   const results = []
+  const debug = {
+    pages: pdf.numPages,
+    totalWords: 0,
+    jerseyTokens: 0,
+    namesFound: 0,
+    pctWordsTotal: 0,
+    fracWordsTotal: 0,
+    zonesMatchedTotal: 0,
+    sampleWords: [],
+  }
 
   for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
     const page = await pdf.getPage(pageNum)
     const items = await extractPageItems(page)
+    debug.totalWords += items.length
+    if (debug.sampleWords.length < 15) {
+      debug.sampleWords.push(...items.slice(0, 15 - debug.sampleWords.length).map((w) => w.text))
+    }
 
     const jerseyTokens = items.filter((w) => /^#\d+$/.test(w.text))
+    debug.jerseyTokens += jerseyTokens.length
     const rowTops = clusterValues(jerseyTokens.map((w) => w.top), CLUSTER_TOLERANCE)
     const colX0s = clusterValues(jerseyTokens.map((w) => w.x0), CLUSTER_TOLERANCE)
 
@@ -91,6 +108,7 @@ export async function parseShotChartPdf(file) {
         }
         const name = nameParts.join(' ')
         if (!name) continue
+        debug.namesFound += 1
 
         const chartX0 = colX + CHART_OFFSET_X
         const chartTop = rowTop + CHART_OFFSET_Y
@@ -111,6 +129,8 @@ export async function parseShotChartPdf(file) {
             w.top >= chartTop - 5 &&
             w.top <= chartTop + CHART_HEIGHT + 15
         )
+        debug.pctWordsTotal += pctWords.length
+        debug.fracWordsTotal += fracWords.length
 
         const zones = []
         const usedFracs = new Set()
@@ -137,6 +157,7 @@ export async function parseShotChartPdf(file) {
             }
           }
         }
+        debug.zonesMatchedTotal += zones.length
 
         if (zones.length > 0) {
           results.push({ jersey, name, zones })
@@ -145,5 +166,5 @@ export async function parseShotChartPdf(file) {
     }
   }
 
-  return results
+  return { players: results, debug }
 }
