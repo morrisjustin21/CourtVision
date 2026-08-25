@@ -77,7 +77,7 @@ export default function AdditionalStats({ team }) {
     <div>
       <div className="flex items-center justify-between mb-1 gap-2 flex-wrap">
         <h1 className="font-display text-2xl font-semibold text-chalkdim uppercase tracking-wide text-sm">
-          Team Strengths & Weaknesses
+          Tendencies
         </h1>
         {seasons.length > 0 && (
           <select
