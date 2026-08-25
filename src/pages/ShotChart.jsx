@@ -15,7 +15,11 @@ export function useShotZoneData(team) {
   useEffect(() => {
     async function load() {
       setLoading(true)
-      const { data: players } = await supabase.from('players').select('id').eq('team_id', team.id)
+      const { data: players } = await supabase
+        .from('players')
+        .select('id')
+        .eq('team_id', team.id)
+        .eq('include_in_scouting_report', true)
       const playerIds = (players || []).map((p) => p.id)
       let rows = []
       if (playerIds.length > 0) {
@@ -45,6 +49,56 @@ export function useShotZoneData(team) {
   )
 
   return { loading, aggregated, hasData, totals }
+}
+
+// Per-player shot zone data for every player on the roster (regardless of
+// their include/exclude toggle — that filter only applies to the combined
+// team chart, not this per-player browsing view).
+export function usePlayerShotZoneData(team) {
+  const [loading, setLoading] = useState(true)
+  const [players, setPlayers] = useState([])
+  const [zoneRows, setZoneRows] = useState([])
+
+  async function load() {
+    setLoading(true)
+    const { data: playersData } = await supabase
+      .from('players')
+      .select('id, name, jersey_number, include_in_scouting_report')
+      .eq('team_id', team.id)
+      .order('jersey_number')
+    const playerIds = (playersData || []).map((p) => p.id)
+    let rows = []
+    if (playerIds.length > 0) {
+      const { data } = await supabase.from('player_shot_zones').select('*').in('player_id', playerIds)
+      rows = data || []
+    }
+    setPlayers(playersData || [])
+    setZoneRows(rows)
+    setLoading(false)
+  }
+
+  useEffect(() => {
+    load()
+  }, [team.id])
+
+  const byPlayer = useMemo(() => {
+    const map = {}
+    players.forEach((p) => {
+      map[p.id] = { player: p, aggregated: {}, made: 0, attempted: 0 }
+    })
+    zoneRows.forEach((r) => {
+      const entry = map[r.player_id]
+      if (!entry) return
+      if (!entry.aggregated[r.zone]) entry.aggregated[r.zone] = { made: 0, attempted: 0 }
+      entry.aggregated[r.zone].made += r.made || 0
+      entry.aggregated[r.zone].attempted += r.attempted || 0
+      entry.made += r.made || 0
+      entry.attempted += r.attempted || 0
+    })
+    return Object.values(map).filter((e) => e.attempted > 0)
+  }, [players, zoneRows])
+
+  return { loading, byPlayer, reload: load }
 }
 
 const PALETTES = {
