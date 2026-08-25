@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { useCurrentSeason } from '../useCurrentSeason'
 import { ShotChartSvg } from './ShotChart'
-import { generateInsights } from '../basketballInsights'
+import { generateInsights, PLAYER_METHODOLOGY } from '../basketballInsights'
 
 function StatCard({ label, value, sub }) {
   return (
@@ -269,6 +269,19 @@ export default function PlayerDevelopment({ player, team, onBack, onPlayerUpdate
         benchmarks — a starting point for a conversation, not a verdict. Your own judgment on this
         player always comes first.
       </p>
+      <details className="mb-3 text-xs">
+        <summary className="text-chalkdim hover:text-chalk cursor-pointer select-none">
+          How these suggestions are calculated
+        </summary>
+        <div className="mt-2 space-y-2 border-l border-line pl-3">
+          {PLAYER_METHODOLOGY.map((m) => (
+            <div key={m.metric}>
+              <p className="font-medium text-chalk">{m.metric}</p>
+              <p className="text-chalkdim">{m.detail}</p>
+            </div>
+          ))}
+        </div>
+      </details>
       <div className="mb-6">
         {summary.games === 0 ? (
           <div className="border border-dashed border-line rounded-lg p-6 text-center text-chalkdim text-sm">
