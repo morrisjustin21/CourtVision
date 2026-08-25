@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { useCurrentSeason } from '../useCurrentSeason'
 import { ShotChartSvg } from './ShotChart'
+import { generateInsights } from '../basketballInsights'
 
 function StatCard({ label, value, sub }) {
   return (
@@ -135,8 +136,16 @@ export default function PlayerDevelopment({ player, team, onBack, onPlayerUpdate
       totalPoints: totals.points,
       totalRebounds: totals.rebounds,
       totalAssists: totals.assists,
+      totalTurnovers: totals.turnovers,
+      totalFga: totals.two_att + totals.three_att,
+      totalFta: totals.ft_att,
+      totalFtMade: totals.ft_made,
+      totalThreeAtt: totals.three_att,
+      totalThreeMade: totals.three_made,
     }
   }, [filteredStatsRows])
+
+  const insights = useMemo(() => generateInsights(summary, shotAgg), [summary, shotAgg])
 
   async function saveNotes() {
     setSaving(true)
@@ -252,6 +261,36 @@ export default function PlayerDevelopment({ player, team, onBack, onPlayerUpdate
         )}
       </div>
 
+      <h3 className="font-display text-xl font-semibold text-chalkdim uppercase tracking-wide text-sm mb-2">
+        Suggested Areas of Improvement
+      </h3>
+      <p className="text-xs text-chalkdim mb-3">
+        Auto-generated from stats and shot chart data against general basketball analytics
+        benchmarks — a starting point for a conversation, not a verdict. Your own judgment on this
+        player always comes first.
+      </p>
+      <div className="mb-6">
+        {summary.games < 3 ? (
+          <div className="border border-dashed border-line rounded-lg p-6 text-center text-chalkdim text-sm">
+            Not enough games logged yet ({summary.games} of 3 minimum) to generate suggestions.
+          </div>
+        ) : insights.length === 0 ? (
+          <div className="border border-dashed border-line rounded-lg p-6 text-center text-chalkdim text-sm">
+            No specific concerns flagged — {player.name}'s numbers look solid against every
+            benchmark checked.
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {insights.map((insight, i) => (
+              <div key={i} className="bg-panel border border-red/40 rounded-lg p-4">
+                <p className="font-medium text-sm mb-1">{insight.title}</p>
+                <p className="text-chalkdim text-sm">{insight.detail}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       <h3 className="font-display text-xl font-semibold text-chalkdim uppercase tracking-wide text-sm mb-3">
         Strengths
       </h3>
@@ -310,13 +349,14 @@ export default function PlayerDevelopment({ player, team, onBack, onPlayerUpdate
           hasShotData={hasShotData}
           shotAgg={shotAgg}
           shotTotals={shotTotals}
+          insights={insights}
         />
       </div>
     </div>
   )
 }
 
-function PrintablePlayerReport({ player, team, summary, strengths, weaknesses, growthNotes, hasShotData, shotAgg, shotTotals }) {
+function PrintablePlayerReport({ player, team, summary, strengths, weaknesses, growthNotes, hasShotData, shotAgg, shotTotals, insights }) {
   const today = new Date().toLocaleDateString(undefined, {
     year: 'numeric',
     month: 'long',
@@ -368,6 +408,21 @@ function PrintablePlayerReport({ player, team, summary, strengths, weaknesses, g
       {hasShotData && (
         <div className="mb-4 flex justify-center">
           <ShotChartSvg aggregated={shotAgg} variant="light" className="w-full max-w-[220px]" />
+        </div>
+      )}
+
+      {insights && insights.length > 0 && (
+        <div className="mb-4">
+          <p className="text-[10px] uppercase tracking-wide text-gray-500 font-semibold mb-1.5">
+            Suggested Areas of Improvement
+          </p>
+          <div className="space-y-1.5">
+            {insights.map((insight, i) => (
+              <p key={i} className="text-xs text-black leading-snug">
+                <span className="font-semibold">{insight.title}:</span> {insight.detail}
+              </p>
+            ))}
+          </div>
         </div>
       )}
 
