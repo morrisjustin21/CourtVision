@@ -270,9 +270,9 @@ export default function PlayerDevelopment({ player, team, onBack, onPlayerUpdate
         player always comes first.
       </p>
       <div className="mb-6">
-        {summary.games < 3 ? (
+        {summary.games === 0 ? (
           <div className="border border-dashed border-line rounded-lg p-6 text-center text-chalkdim text-sm">
-            Not enough games logged yet ({summary.games} of 3 minimum) to generate suggestions.
+            No box scores logged yet for {player.name} — suggestions will appear once stats are entered.
           </div>
         ) : insights.length === 0 ? (
           <div className="border border-dashed border-line rounded-lg p-6 text-center text-chalkdim text-sm">
