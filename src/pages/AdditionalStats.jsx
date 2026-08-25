@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { useCurrentSeason } from '../useCurrentSeason'
 import { useShotZoneData } from './ShotChart'
-import { generateTeamInsights } from '../basketballInsights'
+import { generateTeamInsights, TEAM_METHODOLOGY } from '../basketballInsights'
 
 export default function AdditionalStats({ team }) {
   const [loading, setLoading] = useState(true)
@@ -92,11 +92,24 @@ export default function AdditionalStats({ team }) {
           </select>
         )}
       </div>
-      <p className="text-chalkdim text-sm mb-6">
+      <p className="text-chalkdim text-sm mb-3">
         Auto-generated from {team.name}'s stats and shot chart data against general basketball
         analytics benchmarks — a scouting starting point, not the final word. Weaknesses are framed
         as ideas for how to attack this team; strengths are things to respect and defend carefully.
       </p>
+      <details className="mb-6 text-xs">
+        <summary className="text-chalkdim hover:text-chalk cursor-pointer select-none">
+          How these are calculated
+        </summary>
+        <div className="mt-2 space-y-2 border-l border-line pl-3 max-w-2xl">
+          {TEAM_METHODOLOGY.map((m) => (
+            <div key={m.metric}>
+              <p className="font-medium text-chalk">{m.metric}</p>
+              <p className="text-chalkdim">{m.detail}</p>
+            </div>
+          ))}
+        </div>
+      </details>
 
       {!isReady ? (
         <p className="text-chalkdim">Loading…</p>
