@@ -763,12 +763,12 @@ function GameDetail({ game: initialGame, onBack }) {
     setShotChartUnmatched((p) => ({ ...p, [side]: [] }))
     setShotChartSaved((p) => ({ ...p, [side]: false }))
     try {
-      const players = await parseShotChartPdf(file)
+      const { players, debug } = await parseShotChartPdf(file)
 
       if (players.length === 0) {
         setShotChartError((p) => ({
           ...p,
-          [side]: "Couldn't find any player shot data in that PDF. The file may be a different format than expected.",
+          [side]: `Couldn't find any player shot data. Diagnostics — pages: ${debug.pages}, words extracted: ${debug.totalWords}, jersey numbers found: ${debug.jerseyTokens}, player names found: ${debug.namesFound}, percentages found: ${debug.pctWordsTotal}, fractions found: ${debug.fracWordsTotal}, zones matched: ${debug.zonesMatchedTotal}. First words seen: ${debug.sampleWords.map((w) => `"${w}"`).join(', ')}`,
         }))
         setShotChartImporting((p) => ({ ...p, [side]: false }))
         return
