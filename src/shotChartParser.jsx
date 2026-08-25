@@ -126,4 +126,3 @@ export async function parseShotChartPdf(file) {
 
   return results
 }
-Add shotChartParser.js
