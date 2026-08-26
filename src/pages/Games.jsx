@@ -607,6 +607,46 @@ function NewTeamInlineForm({
   )
 }
 
+const CHECKLIST_ITEMS = [
+  { key: 'shot_chart_reviewed', label: 'Shot chart reviewed' },
+  { key: 'matchups_set', label: 'Starting 5 matchups set' },
+  { key: 'report_printed', label: 'Scouting report printed' },
+  { key: 'roster_confirmed', label: 'Roster confirmed' },
+]
+
+function PreGameChecklist({ checklist, onToggle }) {
+  const items = checklist || {}
+  const doneCount = CHECKLIST_ITEMS.filter((item) => items[item.key]).length
+
+  return (
+    <div className="bg-panel border border-line rounded-lg p-4 mb-6 print:hidden">
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="font-display text-sm font-semibold text-chalkdim uppercase tracking-wide">
+          Pre-Game Checklist
+        </h3>
+        <span className="text-xs text-chalkdim stat-figure">
+          {doneCount}/{CHECKLIST_ITEMS.length}
+        </span>
+      </div>
+      <div className="flex flex-wrap gap-x-6 gap-y-2">
+        {CHECKLIST_ITEMS.map((item) => (
+          <label key={item.key} className="flex items-center gap-2 text-sm cursor-pointer">
+            <input
+              type="checkbox"
+              checked={!!items[item.key]}
+              onChange={() => onToggle(item.key)}
+              className="cursor-pointer"
+            />
+            <span className={items[item.key] ? 'text-chalkdim line-through' : 'text-chalk'}>
+              {item.label}
+            </span>
+          </label>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function GameDetail({ game: initialGame, onBack }) {
   const [game, setGame] = useState(initialGame)
   const [homeRoster, setHomeRoster] = useState([])
@@ -627,6 +667,13 @@ function GameDetail({ game: initialGame, onBack }) {
     await supabase.from('games').delete().eq('id', game.id)
     setDeletingGame(false)
     onBack()
+  }
+
+  async function toggleChecklistItem(key) {
+    const current = game.checklist || {}
+    const updated = { ...current, [key]: !current[key] }
+    setGame((g) => ({ ...g, checklist: updated }))
+    await supabase.from('games').update({ checklist: updated }).eq('id', game.id)
   }
 
   async function loadData() {
@@ -878,6 +925,8 @@ function GameDetail({ game: initialGame, onBack }) {
           </div>
         </div>
       )}
+
+      {!showEditGame && <PreGameChecklist checklist={game.checklist} onToggle={toggleChecklistItem} />}
 
       {loading ? (
         <p className="text-chalkdim">Loading…</p>
