@@ -16,7 +16,7 @@ export const SHOT_ZONES = [
   {
     id: 'left_baseline',
     label: 'Left Baseline',
-    type: '2PT',
+    type: '3PT',
     points: [[27.67, 38.53], [27.67, 65.09], [27.7, 65.15], [27.51, 65.25], [0.0, 65.25], [0.0, 0.2], [0.16, 0.04], [27.67, 0.04]],
   },
   {
@@ -46,7 +46,7 @@ export const SHOT_ZONES = [
   {
     id: 'right_baseline',
     label: 'Right Baseline',
-    type: '2PT',
+    type: '3PT',
     points: [[187.03, 0.2], [187.03, 65.25], [158.97, 65.25], [159.04, 65.09], [159.04, 0.2], [159.04, 0.04], [187.03, 0.04]],
   },
   {
@@ -81,8 +81,8 @@ export const SHOT_ZONES = [
   },
   {
     id: 'top_key_3',
-    label: 'Top of Key 3',
-    type: '3PT',
+    label: 'Top of Key',
+    type: '2PT',
     points: [[123.73, 76.7], [123.73, 99.46], [93.52, 105.69], [93.2, 105.69], [62.98, 99.46], [62.98, 76.7], [93.52, 76.7]],
   },
   {
