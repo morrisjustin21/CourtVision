@@ -3,6 +3,7 @@ import { supabase } from '../supabaseClient'
 import { useCurrentSeason } from '../useCurrentSeason'
 import { ShotChartSvg } from './ShotChart'
 import { generateInsights, PLAYER_METHODOLOGY } from '../basketballInsights'
+import { generateMilestones } from '../milestones'
 
 function StatCard({ label, value, sub }) {
   return (
@@ -39,7 +40,9 @@ export default function PlayerDevelopment({ player, team, onBack, onPlayerUpdate
       setLoading(true)
       const { data } = await supabase
         .from('player_game_stats')
-        .select('*, game:game_id(id, game_date, season)')
+        .select(
+          '*, game:game_id(id, game_date, season, home_team_id, away_team_id, home_team:home_team_id(name), away_team:away_team_id(name))'
+        )
         .eq('player_id', player.id)
       setStatsRows(data || [])
       setLoading(false)
@@ -146,6 +149,7 @@ export default function PlayerDevelopment({ player, team, onBack, onPlayerUpdate
   }, [filteredStatsRows])
 
   const insights = useMemo(() => generateInsights(summary, shotAgg), [summary, shotAgg])
+  const milestones = useMemo(() => generateMilestones(filteredStatsRows, team.id), [filteredStatsRows, team.id])
 
   async function saveNotes() {
     setSaving(true)
@@ -234,6 +238,45 @@ export default function PlayerDevelopment({ player, team, onBack, onPlayerUpdate
             <StatCard label="2PT%" value={fmtPct(summary.twoPct)} />
             <StatCard label="3PT%" value={fmtPct(summary.threePct)} />
             <StatCard label="FT%" value={fmtPct(summary.ftPct)} />
+          </div>
+        </>
+      )}
+
+      {(milestones.badges.length > 0 || milestones.seasonHighs.points) && (
+        <>
+          <h3 className="font-display text-xl font-semibold text-chalkdim uppercase tracking-wide text-sm mb-3">
+            Milestones & Season Highs
+          </h3>
+          {milestones.badges.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-4">
+              {milestones.badges.map((badge) => (
+                <span
+                  key={badge.label}
+                  title={badge.detail}
+                  className="text-sm font-semibold bg-red text-white rounded-full px-4 py-1.5"
+                >
+                  {badge.label}
+                </span>
+              ))}
+            </div>
+          )}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+            {['points', 'rebounds', 'assists'].map((cat) => {
+              const high = milestones.seasonHighs[cat]
+              if (!high) return null
+              const labels = { points: 'Points', rebounds: 'Rebounds', assists: 'Assists' }
+              return (
+                <div key={cat} className="bg-panel border border-line rounded-lg p-4">
+                  <p className="text-[10px] uppercase tracking-wide text-chalkdim mb-1">
+                    Season High — {labels[cat]}
+                  </p>
+                  <p className="font-display text-3xl font-bold stat-figure">{high.value}</p>
+                  <p className="text-xs text-chalkdim mt-0.5">
+                    {[high.opponent && `vs ${high.opponent}`, high.date].filter(Boolean).join(' · ')}
+                  </p>
+                </div>
+              )
+            })}
           </div>
         </>
       )}
@@ -363,13 +406,14 @@ export default function PlayerDevelopment({ player, team, onBack, onPlayerUpdate
           shotAgg={shotAgg}
           shotTotals={shotTotals}
           insights={insights}
+          milestones={milestones}
         />
       </div>
     </div>
   )
 }
 
-function PrintablePlayerReport({ player, team, summary, strengths, weaknesses, growthNotes, hasShotData, shotAgg, shotTotals, insights }) {
+function PrintablePlayerReport({ player, team, summary, strengths, weaknesses, growthNotes, hasShotData, shotAgg, shotTotals, insights, milestones }) {
   const today = new Date().toLocaleDateString(undefined, {
     year: 'numeric',
     month: 'long',
@@ -416,6 +460,30 @@ function PrintablePlayerReport({ player, team, summary, strengths, weaknesses, g
             <div>{row('FT%', fmtPct(summary.ftPct))}</div>
           </div>
         </>
+      )}
+
+      {milestones && (milestones.badges.length > 0 || milestones.seasonHighs.points) && (
+        <div className="mb-4">
+          <p className="text-[10px] uppercase tracking-wide text-gray-500 font-semibold mb-1.5">
+            Milestones & Season Highs
+          </p>
+          {milestones.badges.length > 0 && (
+            <p className="text-xs text-black mb-1">
+              {milestones.badges.map((b) => b.label).join('  ·  ')}
+            </p>
+          )}
+          <p className="text-xs text-gray-700">
+            {['points', 'rebounds', 'assists']
+              .map((cat) => {
+                const high = milestones.seasonHighs[cat]
+                if (!high) return null
+                const labels = { points: 'PTS', rebounds: 'REB', assists: 'AST' }
+                return `${high.value} ${labels[cat]} (${[high.opponent && `vs ${high.opponent}`, high.date].filter(Boolean).join(', ')})`
+              })
+              .filter(Boolean)
+              .join('  ·  ')}
+          </p>
+        </div>
       )}
 
       {hasShotData && (
