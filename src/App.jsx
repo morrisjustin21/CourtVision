@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
 import Login from './pages/Login'
+import Dashboard from './pages/Dashboard'
 import Teams from './pages/Teams'
 import Games from './pages/Games'
 import Leaders from './pages/Leaders'
@@ -11,7 +12,7 @@ import Nav from './components/Nav'
 
 export default function App() {
   const [session, setSession] = useState(undefined) // undefined = loading
-  const [view, setView] = useState('teams')
+  const [view, setView] = useState('dashboard')
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session))
@@ -37,6 +38,7 @@ export default function App() {
     <div className="min-h-screen flex flex-col">
       <Nav view={view} setView={setView} />
       <main className="flex-1 w-full max-w-7xl mx-auto px-5 py-6 md:px-8 md:py-8">
+        {view === 'dashboard' && <Dashboard setView={setView} />}
         {view === 'teams' && <Teams />}
         {view === 'games' && <Games />}
         {view === 'needsstats' && <NeedsStats />}
