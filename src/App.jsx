@@ -6,6 +6,7 @@ import Games from './pages/Games'
 import Leaders from './pages/Leaders'
 import Automation from './pages/Automation'
 import TonightsMatchups from './pages/TonightsMatchups'
+import NeedsStats from './pages/NeedsStats'
 import Nav from './components/Nav'
 
 export default function App() {
@@ -38,6 +39,7 @@ export default function App() {
       <main className="flex-1 w-full max-w-7xl mx-auto px-5 py-6 md:px-8 md:py-8">
         {view === 'teams' && <Teams />}
         {view === 'games' && <Games />}
+        {view === 'needsstats' && <NeedsStats />}
         {view === 'tonight' && <TonightsMatchups />}
         {view === 'stats' && <Leaders />}
         {view === 'automation' && <Automation />}
