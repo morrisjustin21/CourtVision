@@ -647,6 +647,112 @@ function PreGameChecklist({ checklist, onToggle }) {
   )
 }
 
+function QuarterScores({ game, onSaved }) {
+  const existing = game.quarter_scores
+  const [expanded, setExpanded] = useState(!!existing)
+  const [scores, setScores] = useState(() => {
+    if (!existing) return { home: ['', '', '', ''], away: ['', '', '', ''] }
+    const normalize = (arr) => (arr || ['', '', '', '']).map((v) => (v == null ? '' : v))
+    return { home: normalize(existing.home), away: normalize(existing.away) }
+  })
+  const [saving, setSaving] = useState(false)
+
+  function updateQuarter(side, index, value) {
+    setScores((prev) => {
+      const updated = { ...prev, [side]: [...prev[side]] }
+      updated[side][index] = value
+      return updated
+    })
+  }
+
+  function total(side) {
+    return scores[side].reduce((sum, v) => sum + (parseInt(v, 10) || 0), 0)
+  }
+
+  async function save() {
+    setSaving(true)
+    const cleaned = {
+      home: scores.home.map((v) => (v === '' ? null : parseInt(v, 10))),
+      away: scores.away.map((v) => (v === '' ? null : parseInt(v, 10))),
+    }
+    await supabase.from('games').update({ quarter_scores: cleaned }).eq('id', game.id)
+    setSaving(false)
+    onSaved(cleaned)
+  }
+
+  if (!expanded) {
+    return (
+      <button
+        onClick={() => setExpanded(true)}
+        className="text-xs text-chalkdim hover:text-chalk mb-6 print:hidden"
+      >
+        + Add quarter-by-quarter scoring
+      </button>
+    )
+  }
+
+  const homeTotal = total('home')
+  const awayTotal = total('away')
+  const homeMismatch = game.home_score != null && homeTotal > 0 && homeTotal !== game.home_score
+  const awayMismatch = game.away_score != null && awayTotal > 0 && awayTotal !== game.away_score
+
+  return (
+    <div className="bg-panel border border-line rounded-lg p-4 mb-6 print:hidden">
+      <h3 className="font-display text-sm font-semibold text-chalkdim uppercase tracking-wide mb-3">
+        Quarter-by-Quarter Scoring
+      </h3>
+      <div className="overflow-x-auto">
+        <table className="text-sm min-w-[420px]">
+          <thead>
+            <tr className="text-chalkdim text-xs uppercase tracking-wide">
+              <th className="text-left pr-3 pb-2 font-medium">Team</th>
+              {['Q1', 'Q2', 'Q3', 'Q4'].map((q) => (
+                <th key={q} className="px-2 pb-2 font-medium text-center">{q}</th>
+              ))}
+              <th className="px-2 pb-2 font-medium text-center">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {[
+              { side: 'away', label: game.away_team?.name, mismatch: awayMismatch, total: awayTotal },
+              { side: 'home', label: game.home_team?.name, mismatch: homeMismatch, total: homeTotal },
+            ].map((row) => (
+              <tr key={row.side} className="border-t border-line">
+                <td className="pr-3 py-2 font-medium whitespace-nowrap">{row.label}</td>
+                {[0, 1, 2, 3].map((i) => (
+                  <td key={i} className="px-1 py-2">
+                    <input
+                      type="number"
+                      value={scores[row.side][i]}
+                      onChange={(e) => updateQuarter(row.side, i, e.target.value)}
+                      className="w-14 bg-panel2 border border-line rounded-md px-2 py-1 text-center focus:border-red outline-none"
+                    />
+                  </td>
+                ))}
+                <td className="px-2 py-2 text-center stat-figure font-bold">
+                  {row.total}
+                  {row.mismatch && (
+                    <span className="block text-[10px] text-alert font-normal normal-case">
+                      ≠ final ({row.side === 'home' ? game.home_score : game.away_score})
+                    </span>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <button
+        onClick={save}
+        disabled={saving}
+        className="mt-3 bg-red text-white font-semibold text-xs rounded-md px-4 py-1.5 hover:bg-red/90 disabled:opacity-60"
+      >
+        {saving ? 'Saving…' : 'Save quarter scores'}
+      </button>
+    </div>
+  )
+}
+
 function GameDetail({ game: initialGame, onBack }) {
   const [game, setGame] = useState(initialGame)
   const [homeRoster, setHomeRoster] = useState([])
@@ -927,6 +1033,13 @@ function GameDetail({ game: initialGame, onBack }) {
       )}
 
       {!showEditGame && <PreGameChecklist checklist={game.checklist} onToggle={toggleChecklistItem} />}
+
+      {!showEditGame && (
+        <QuarterScores
+          game={game}
+          onSaved={(quarter_scores) => setGame((g) => ({ ...g, quarter_scores }))}
+        />
+      )}
 
       {loading ? (
         <p className="text-chalkdim">Loading…</p>
