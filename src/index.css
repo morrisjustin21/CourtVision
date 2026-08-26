@@ -8,6 +8,10 @@
 
 body {
   -webkit-font-smoothing: antialiased;
+  /* Guards against the off-screen containers used for PDF export (positioned
+     far outside the viewport so they can still be captured by html2canvas)
+     ever creating a stray horizontal scrollbar. */
+  overflow-x: hidden;
 }
 
 .stat-figure {
