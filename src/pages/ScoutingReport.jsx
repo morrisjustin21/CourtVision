@@ -25,6 +25,15 @@ function displayName(name, jerseyNumber) {
   return `${jerseyNumber != null ? `#${jerseyNumber} ` : ''}${name}`
 }
 
+// Used specifically for the Starting 5 Matchups section, where a defender's
+// height relative to their assignment is exactly the point — not used by
+// the shared displayName() above, since height would just clutter contexts
+// like leaderboards where it isn't relevant.
+function displayNameWithHeight(player) {
+  const base = displayName(player.name, player.jersey_number)
+  return player.height ? `${base} (${player.height})` : base
+}
+
 function StatCard({ label, value, sub }) {
   return (
     <div className="bg-panel border border-line rounded-lg p-4">
@@ -656,7 +665,7 @@ function MatchupSection({ opponentRoster, myTeamRoster, matchupPlan, setMatchupP
                 <option value="">— Select player —</option>
                 {opponentRoster.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {displayName(p.name, p.jersey_number)}
+                    {displayNameWithHeight(p)}
                   </option>
                 ))}
               </select>
@@ -671,7 +680,7 @@ function MatchupSection({ opponentRoster, myTeamRoster, matchupPlan, setMatchupP
                 <option value="">— Select defender —</option>
                 {myTeamRoster.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {displayName(p.name, p.jersey_number)}
+                    {displayNameWithHeight(p)}
                   </option>
                 ))}
               </select>
@@ -733,7 +742,7 @@ function PrintableReport({
   function playerLabel(roster, id) {
     const p = roster.find((r) => r.id === id)
     if (!p) return null
-    return displayName(p.name, p.jersey_number)
+    return displayNameWithHeight(p)
   }
 
   const activeMatchups = (matchupPlan || []).filter((s) => s.opponentPlayerId || s.defenderPlayerId || s.notes)
