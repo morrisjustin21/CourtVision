@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { useCurrentSeason } from '../useCurrentSeason'
 import { ShotChartSvg } from './ShotChart'
 import { generateInsights, PLAYER_METHODOLOGY } from '../basketballInsights'
 import { generateMilestones } from '../milestones'
+import html2canvas from 'html2canvas'
+import jsPDF from 'jspdf'
 
 function StatCard({ label, value, sub }) {
   return (
@@ -34,6 +36,25 @@ export default function PlayerDevelopment({ player, team, onBack, onPlayerUpdate
   const [savedAt, setSavedAt] = useState(null)
   const { season: currentSeason, loading: seasonLoading } = useCurrentSeason()
   const [seasonFilter, setSeasonFilter] = useState(null)
+  const printRef = useRef(null)
+  const [exportingPdf, setExportingPdf] = useState(false)
+  const [pdfError, setPdfError] = useState(null)
+
+  async function downloadPdf() {
+    if (!printRef.current) return
+    setExportingPdf(true)
+    setPdfError(null)
+    try {
+      const canvas = await html2canvas(printRef.current, { scale: 2, backgroundColor: '#ffffff' })
+      const imgData = canvas.toDataURL('image/png')
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'px', format: [canvas.width, canvas.height] })
+      pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height)
+      pdf.save(`${player.name.replace(/\s+/g, '_')}_development_report.pdf`)
+    } catch (err) {
+      setPdfError(`Couldn't generate the PDF: ${err.message || err}`)
+    }
+    setExportingPdf(false)
+  }
 
   useEffect(() => {
     async function load() {
@@ -190,8 +211,17 @@ export default function PlayerDevelopment({ player, team, onBack, onPlayerUpdate
           >
             Print report
           </button>
+          <button
+            onClick={downloadPdf}
+            disabled={exportingPdf}
+            className="bg-red text-white font-semibold text-sm rounded-md px-4 py-2 hover:bg-red/90 disabled:opacity-60 shrink-0"
+          >
+            {exportingPdf ? 'Generating…' : 'Download PDF'}
+          </button>
         </div>
       </div>
+
+      {pdfError && <p className="text-alert text-xs mb-4">{pdfError}</p>}
 
       <div className="mb-6">
         <h1 className="font-display text-4xl font-bold">
@@ -394,7 +424,7 @@ export default function PlayerDevelopment({ player, team, onBack, onPlayerUpdate
       </div>
       </div>
 
-      <div className="hidden print:block">
+      <div ref={printRef} className="absolute -left-[9999px] top-0 w-[816px] bg-white print:static print:left-auto print:w-auto">
         <PrintablePlayerReport
           player={player}
           team={team}
