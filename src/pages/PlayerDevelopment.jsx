@@ -47,8 +47,24 @@ export default function PlayerDevelopment({ player, team, onBack, onPlayerUpdate
     try {
       const canvas = await html2canvas(printRef.current, { scale: 2, backgroundColor: '#ffffff' })
       const imgData = canvas.toDataURL('image/png')
-      const pdf = new jsPDF({ orientation: 'portrait', unit: 'px', format: [canvas.width, canvas.height] })
-      pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height)
+
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'in', format: 'letter' })
+      const pageWidth = pdf.internal.pageSize.getWidth()
+      const pageHeight = pdf.internal.pageSize.getHeight()
+      const margin = 0.4
+      const maxWidth = pageWidth - margin * 2
+      const maxHeight = pageHeight - margin * 2
+
+      const canvasAspect = canvas.width / canvas.height
+      let imgWidth = maxWidth
+      let imgHeight = imgWidth / canvasAspect
+      if (imgHeight > maxHeight) {
+        imgHeight = maxHeight
+        imgWidth = imgHeight * canvasAspect
+      }
+      const x = (pageWidth - imgWidth) / 2
+
+      pdf.addImage(imgData, 'PNG', x, margin, imgWidth, imgHeight)
       pdf.save(`${player.name.replace(/\s+/g, '_')}_development_report.pdf`)
     } catch (err) {
       setPdfError(`Couldn't generate the PDF: ${err.message || err}`)
