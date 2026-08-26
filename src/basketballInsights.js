@@ -7,15 +7,17 @@
 // not a verdict. Every rule requires a minimum sample size before firing,
 // so a single unlucky (or lucky) game can't produce a false flag.
 
+import { zoneById } from './shotZones'
+
 const MIN_ZONE_ATTEMPTS = 5
 const MIN_FGA_FOR_RATE_RULES = 15
 
 const CLOSE_2_ZONES = new Set([
-  'left_baseline', 'left_short_corner', 'left_block',
-  'right_block', 'right_short_corner', 'right_baseline',
+  'left_short_corner', 'left_block',
+  'right_block', 'right_short_corner',
 ])
 const LONG_2_ZONES = new Set([
-  'left_mid_range', 'left_elbow', 'right_elbow', 'right_mid_range',
+  'left_mid_range', 'left_elbow', 'right_elbow', 'right_mid_range', 'top_key_3',
 ])
 
 function sumZones(shotAgg, zoneIds) {
@@ -37,7 +39,7 @@ const ZONE_LABELS = {
   right_short_corner: 'the right short corner', right_baseline: 'the right baseline',
   left_mid_range: 'the left mid-range', left_elbow: 'the left elbow',
   right_elbow: 'the right elbow', right_mid_range: 'the right mid-range',
-  left_corner_3: 'the left corner three', top_key_3: 'the top of the key three',
+  left_corner_3: 'the left corner three', top_key_3: 'the top of the key',
   deep_3: 'deep three-point range', right_corner_3: 'the right corner three',
 }
 
@@ -79,7 +81,7 @@ export function generateInsights(summary, shotAgg = {}) {
   Object.entries(shotAgg).forEach(([zoneId, stat]) => {
     if (!stat || stat.attempted < MIN_ZONE_ATTEMPTS) return
     const zonePct = (stat.made / stat.attempted) * 100
-    const isThree = ['left_corner_3', 'top_key_3', 'deep_3', 'right_corner_3'].includes(zoneId)
+    const isThree = zoneById(zoneId)?.type === '3PT'
     const threshold = isThree ? 28 : 40
     if (zonePct < threshold) {
       insights.push({
@@ -190,7 +192,7 @@ export function generateTeamInsights(teamSummary, shotAgg = {}) {
   Object.entries(shotAgg).forEach(([zoneId, stat]) => {
     if (!stat || stat.attempted < TEAM_MIN_ZONE_ATTEMPTS) return
     const zonePct = (stat.made / stat.attempted) * 100
-    const isThree = ['left_corner_3', 'top_key_3', 'deep_3', 'right_corner_3'].includes(zoneId)
+    const isThree = zoneById(zoneId)?.type === '3PT'
     const coldThreshold = isThree ? 28 : 40
     const hotThreshold = isThree ? 38 : 55
     if (zonePct < coldThreshold) {
