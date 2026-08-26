@@ -247,7 +247,7 @@ export default function PlayerDevelopment({ player, team, onBack, onPlayerUpdate
           {player.name}
         </h1>
         <p className="text-chalkdim text-sm mt-1">
-          {[player.position, team.name].filter(Boolean).join(' · ')}
+          {[player.position, player.height, team.name].filter(Boolean).join(' · ')}
         </p>
       </div>
 
@@ -481,7 +481,7 @@ function PrintablePlayerReport({ player, team, summary, strengths, weaknesses, g
             {player.jersey_number != null && `#${player.jersey_number} `}{player.name}
           </h1>
           <p className="text-xs text-gray-500">
-            {[player.position, team.name].filter(Boolean).join(' · ') || 'Player development report'}
+            {[player.position, player.height, team.name].filter(Boolean).join(' · ') || 'Player development report'}
           </p>
         </div>
         <div className="text-right text-xs text-gray-500">
