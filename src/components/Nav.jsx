@@ -4,6 +4,7 @@ import { useCurrentSeason } from '../useCurrentSeason'
 import Logo from './Logo'
 
 const LINKS = [
+  { key: 'dashboard', label: 'Dashboard' },
   { key: 'teams', label: 'Teams' },
   { key: 'games', label: 'Games' },
   { key: 'needsstats', label: 'Needs Stats' },
