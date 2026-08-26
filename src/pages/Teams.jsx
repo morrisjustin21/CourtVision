@@ -384,7 +384,7 @@ function TeamDetail({ team, onBack, onTeamUpdated }) {
   const [showNewPlayer, setShowNewPlayer] = useState(false)
   const [showEditTeam, setShowEditTeam] = useState(false)
   const [editingPlayerId, setEditingPlayerId] = useState(null)
-  const [editDraft, setEditDraft] = useState({ name: '', jersey_number: '', position: '' })
+  const [editDraft, setEditDraft] = useState({ name: '', jersey_number: '', position: '', height: '' })
   const [name, setName] = useState('')
   const [jersey, setJersey] = useState('')
   const [position, setPosition] = useState('')
@@ -509,6 +509,7 @@ function TeamDetail({ team, onBack, onTeamUpdated }) {
       name: p.name,
       jersey_number: p.jersey_number ?? '',
       position: p.position ?? '',
+      height: p.height ?? '',
     })
   }
 
@@ -519,6 +520,7 @@ function TeamDetail({ team, onBack, onTeamUpdated }) {
         name: editDraft.name,
         jersey_number: editDraft.jersey_number === '' ? null : parseInt(editDraft.jersey_number, 10),
         position: editDraft.position || null,
+        height: editDraft.height || null,
       })
       .eq('id', id)
     setEditingPlayerId(null)
@@ -711,6 +713,7 @@ function TeamDetail({ team, onBack, onTeamUpdated }) {
                 <th className="text-left px-4 py-3 font-medium">#</th>
                 <th className="text-left px-4 py-3 font-medium">Name</th>
                 <th className="text-left px-4 py-3 font-medium">Position</th>
+                <th className="text-left px-4 py-3 font-medium">Height</th>
                 <th className="px-4 py-3"></th>
               </tr>
             </thead>
@@ -741,6 +744,14 @@ function TeamDetail({ team, onBack, onTeamUpdated }) {
                         className="w-full bg-panel border border-line rounded px-2 py-1 focus:border-red outline-none"
                       />
                     </td>
+                    <td className="px-4 py-2">
+                      <input
+                        value={editDraft.height}
+                        onChange={(e) => setEditDraft((d) => ({ ...d, height: e.target.value }))}
+                        placeholder="6'2&quot;"
+                        className="w-20 bg-panel border border-line rounded px-2 py-1 focus:border-red outline-none"
+                      />
+                    </td>
                     <td className="px-4 py-2 text-right whitespace-nowrap">
                       <button
                         onClick={() => saveEditPlayer(p.id)}
@@ -768,6 +779,7 @@ function TeamDetail({ team, onBack, onTeamUpdated }) {
                       </button>
                     </td>
                     <td className="px-4 py-3 text-chalkdim">{p.position ?? '—'}</td>
+                    <td className="px-4 py-3 text-chalkdim stat-figure">{p.height ?? '—'}</td>
                     <td className="px-4 py-3 text-right whitespace-nowrap">
                       <button
                         onClick={() => setSelectedPlayer(p)}
