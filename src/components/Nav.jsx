@@ -6,6 +6,7 @@ import Logo from './Logo'
 const LINKS = [
   { key: 'teams', label: 'Teams' },
   { key: 'games', label: 'Games' },
+  { key: 'needsstats', label: 'Needs Stats' },
   { key: 'tonight', label: "Tonight's Matchups" },
   { key: 'stats', label: 'Leaders' },
   { key: 'automation', label: 'Automation' },
