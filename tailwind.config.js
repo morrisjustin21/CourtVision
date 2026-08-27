@@ -4,15 +4,15 @@ export default {
   theme: {
     extend: {
       colors: {
-        court: '#121316',
-        panel: '#1A1C21',
-        panel2: '#212429',
-        line: '#2B2E35',
-        chalk: '#F5F5F3',
-        chalkdim: '#9CA3AF',
-        red: '#E31B23',
-        reddim: '#7A1014',
-        alert: '#FF7A59',
+        court: 'rgb(var(--color-court) / <alpha-value>)',
+        panel: 'rgb(var(--color-panel) / <alpha-value>)',
+        panel2: 'rgb(var(--color-panel2) / <alpha-value>)',
+        line: 'rgb(var(--color-line) / <alpha-value>)',
+        chalk: 'rgb(var(--color-chalk) / <alpha-value>)',
+        chalkdim: 'rgb(var(--color-chalkdim) / <alpha-value>)',
+        red: 'rgb(var(--color-red) / <alpha-value>)',
+        reddim: 'rgb(var(--color-reddim) / <alpha-value>)',
+        alert: 'rgb(var(--color-alert) / <alpha-value>)',
       },
       fontFamily: {
         display: ['"Barlow Condensed"', 'sans-serif'],
