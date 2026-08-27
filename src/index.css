@@ -4,6 +4,31 @@
 
 :root {
   color-scheme: dark;
+  /* RGB channel triplets (no commas, no rgb() wrapper) so Tailwind's
+     opacity modifiers (e.g. border-red/40) keep working — see
+     tailwind.config.js's rgb(var(...) / <alpha-value>) pattern. */
+  --color-court: 18 19 22;      /* #121316 */
+  --color-panel: 26 28 33;      /* #1A1C21 */
+  --color-panel2: 33 36 41;     /* #212429 */
+  --color-line: 43 46 53;       /* #2B2E35 */
+  --color-chalk: 245 245 243;   /* #F5F5F3 */
+  --color-chalkdim: 156 163 175;/* #9CA3AF */
+  --color-red: 227 27 35;       /* #E31B23 */
+  --color-reddim: 122 16 20;    /* #7A1014 */
+  --color-alert: 255 122 89;    /* #FF7A59 */
+}
+
+[data-theme='light'] {
+  color-scheme: light;
+  --color-court: 244 245 247;   /* #F4F5F7 */
+  --color-panel: 255 255 255;   /* #FFFFFF */
+  --color-panel2: 241 242 244;  /* #F1F2F4 */
+  --color-line: 226 228 233;    /* #E2E4E9 */
+  --color-chalk: 22 24 28;      /* #16181C */
+  --color-chalkdim: 107 114 128;/* #6B7280 */
+  --color-red: 227 27 35;       /* #E31B23 — brand red stays constant */
+  --color-reddim: 122 16 20;    /* #7A1014 */
+  --color-alert: 194 65 12;     /* #C2410C — darkened for contrast on white */
 }
 
 body {
