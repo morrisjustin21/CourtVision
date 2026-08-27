@@ -44,6 +44,31 @@ function SeasonPill() {
   )
 }
 
+function ThemeToggle() {
+  const [theme, setTheme] = useState(() => document.documentElement.dataset.theme === 'light' ? 'light' : 'dark')
+
+  function toggle() {
+    const next = theme === 'light' ? 'dark' : 'light'
+    setTheme(next)
+    if (next === 'light') {
+      document.documentElement.dataset.theme = 'light'
+    } else {
+      delete document.documentElement.dataset.theme
+    }
+    localStorage.setItem('courtvision-theme', next)
+  }
+
+  return (
+    <button
+      onClick={toggle}
+      title={theme === 'light' ? 'Switch to dark theme' : 'Switch to light theme'}
+      className="text-xs text-chalkdim hover:text-chalk border border-line hover:border-red rounded-full px-3 py-1.5 shrink-0"
+    >
+      {theme === 'light' ? '☀️ Light' : '🌙 Dark'}
+    </button>
+  )
+}
+
 export default function Nav({ view, setView }) {
   return (
     <div className="w-full border-b border-line bg-panel print:hidden">
@@ -70,6 +95,7 @@ export default function Nav({ view, setView }) {
 
         <div className="flex items-center gap-3 ml-auto shrink-0">
           <SeasonPill />
+          <ThemeToggle />
           <button
             onClick={() => supabase.auth.signOut()}
             className="text-xs text-chalkdim hover:text-chalk px-2 py-1"
