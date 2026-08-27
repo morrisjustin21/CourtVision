@@ -1,18 +1,73 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>CourtVision</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap"
-      rel="stylesheet"
-    />
-  </head>
-  <body class="bg-court text-chalk font-body">
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
-</html>
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  /* RGB channel triplets (no commas, no rgb() wrapper) so Tailwind's
+     opacity modifiers (e.g. border-red/40) keep working — see
+     tailwind.config.js's rgb(var(...) / <alpha-value>) pattern. */
+  --color-court: 18 19 22;      /* #121316 */
+  --color-panel: 26 28 33;      /* #1A1C21 */
+  --color-panel2: 33 36 41;     /* #212429 */
+  --color-line: 43 46 53;       /* #2B2E35 */
+  --color-chalk: 245 245 243;   /* #F5F5F3 */
+  --color-chalkdim: 156 163 175;/* #9CA3AF */
+  --color-red: 227 27 35;       /* #E31B23 */
+  --color-reddim: 122 16 20;    /* #7A1014 */
+  --color-alert: 255 122 89;    /* #FF7A59 */
+}
+
+[data-theme='light'] {
+  color-scheme: light;
+  --color-court: 244 245 247;   /* #F4F5F7 */
+  --color-panel: 255 255 255;   /* #FFFFFF */
+  --color-panel2: 241 242 244;  /* #F1F2F4 */
+  --color-line: 226 228 233;    /* #E2E4E9 */
+  --color-chalk: 22 24 28;      /* #16181C */
+  --color-chalkdim: 107 114 128;/* #6B7280 */
+  --color-red: 227 27 35;       /* #E31B23 — brand red stays constant */
+  --color-reddim: 122 16 20;    /* #7A1014 */
+  --color-alert: 194 65 12;     /* #C2410C — darkened for contrast on white */
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  /* Guards against the off-screen containers used for PDF export (positioned
+     far outside the viewport so they can still be captured by html2canvas)
+     ever creating a stray horizontal scrollbar. */
+  overflow-x: hidden;
+}
+
+.stat-figure {
+  font-variant-numeric: tabular-nums;
+}
+
+::selection {
+  background: #E8871E;
+  color: #14171C;
+}
+
+/* visible keyboard focus */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid #E8871E;
+  outline-offset: 2px;
+}
+
+/* Printing: the app is dark-themed, but printed pages should be normal
+   black-on-white paper, not a dark background wasting ink. Individual
+   printable layouts (see PrintableReport) use explicit black/gray text
+   so they stay legible once this override kicks in. */
+@media print {
+  @page {
+    size: letter;
+    margin: 0.5in;
+  }
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+}
