@@ -96,9 +96,53 @@ function parseScheduleRows(html) {
   return rows
 }
 
-function normalizeName(name) {
-  return name.trim().toUpperCase().replace(/[^A-Z0-9]/g, '')
+// ---- Team name matching ----
+// Kept identical in src/teamMatching.js and api/cron/check-scores.js.
+// OSSAA (and coaches) sometimes include a mascot — "Elgin Owls" — where
+// CourtVision just has "Elgin". Names match when one is the same as, or
+// begins with, the other, compared word by word. "Elgin Owls" matches
+// "Elgin"; "Southeast" does NOT match "South".
+function nameWords(name) {
+  return (name || '').toUpperCase().replace(/[^A-Z0-9]+/g, ' ').trim().split(' ').filter(Boolean)
 }
+
+function isWordPrefix(shorter, longer) {
+  return shorter.length > 0 && shorter.length <= longer.length && shorter.every((w, i) => w === longer[i])
+}
+
+function matchScore(rawWords, teamWords) {
+  if (rawWords.length === 0 || teamWords.length === 0) return 0
+  if (rawWords.join('') === teamWords.join('')) return 1000 // same name (ignoring spacing/punctuation)
+  if (isWordPrefix(teamWords, rawWords)) return teamWords.length * 10 // raw has extra words (a mascot)
+  if (isWordPrefix(rawWords, teamWords)) return rawWords.length * 10 - 1 // our team name has extra words
+  return 0
+}
+
+// Returns the single best matching team, or null if nothing matches or two
+// teams tie (better to ask than to guess).
+function findTeamMatch(raw, teams) {
+  const rawWords = nameWords(raw)
+  let best = null
+  let bestScore = 0
+  let tie = false
+  for (const team of teams || []) {
+    const score = matchScore(rawWords, nameWords(team.name))
+    if (score === 0) continue
+    if (score > bestScore) {
+      best = team
+      bestScore = score
+      tie = false
+    } else if (score === bestScore) {
+      tie = true
+    }
+  }
+  return best && !tie ? best : null
+}
+
+function namesMatch(a, b) {
+  return matchScore(nameWords(a), nameWords(b)) > 0
+}
+// ---- end team name matching ----
 
 export default async function handler(req, res) {
   // Vercel sends this header automatically on real cron invocations.
@@ -120,10 +164,57 @@ export default async function handler(req, res) {
     .not('ossaa_schedule_url', 'is', null)
 
   const { data: allTeams } = await supabase.from('teams').select('id, name')
-  const teamByNormalizedName = new Map((allTeams || []).map((t) => [normalizeName(t.name), t.id]))
+
+  // Everything already known, so a game that shows up on BOTH teams' schedule
+  // pages (or is already in CourtVision) doesn't produce a second entry.
+  const cutoff = new Date(Date.now() - 400 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+  const { data: existingReviews } = await supabase
+    .from('pending_score_reviews')
+    .select('team_id, matched_opponent_team_id, opponent_raw, game_date, entry_type')
+    .gte('game_date', cutoff)
+  const { data: existingGames } = await supabase
+    .from('games')
+    .select('id, game_date, home_team_id, away_team_id, home_score, away_score')
+    .gte('game_date', cutoff)
+  const knownReviews = [...(existingReviews || [])]
+
+  function alreadyCovered(team, row, oppId) {
+    // A score review also covers a schedule entry for the same game.
+    const typeCovers = (t) => t === row.type || (row.type === 'schedule' && t === 'score')
+
+    const hasReview = knownReviews.some((r) => {
+      if (r.game_date !== row.gameDate || !typeCovers(r.entry_type)) return false
+      const rOpp = r.matched_opponent_team_id || findTeamMatch(r.opponent_raw, allTeams || [])?.id || null
+      // Same team's own page, opponent spelled differently ("Elgin" vs "Elgin Owls")
+      const sameSide =
+        r.team_id === team.id && (oppId ? rOpp === oppId : namesMatch(r.opponent_raw, row.opponentRaw))
+      // The OTHER team's page reporting this same game
+      const otherSide = oppId && r.team_id === oppId && rOpp === team.id
+      return sameSide || otherSide
+    })
+    if (hasReview) return true
+
+    if (oppId) {
+      const game = (existingGames || []).find(
+        (g) =>
+          g.game_date === row.gameDate &&
+          ((g.home_team_id === team.id && g.away_team_id === oppId) ||
+            (g.home_team_id === oppId && g.away_team_id === team.id))
+      )
+      if (game) {
+        // Already scheduled: nothing to add. Already scored the same way: nothing to change.
+        if (row.type === 'schedule') return true
+        const ours = game.home_team_id === team.id ? game.home_score : game.away_score
+        const theirs = game.home_team_id === team.id ? game.away_score : game.home_score
+        if (ours === row.teamScore && theirs === row.opponentScore) return true
+      }
+    }
+    return false
+  }
 
   let totalFound = 0
   let totalInserted = 0
+  let skippedDuplicates = 0
   const errors = []
 
   for (const team of teams || []) {
@@ -133,14 +224,20 @@ export default async function handler(req, res) {
       totalFound += rows.length
 
       for (const row of rows) {
-        const matchedOpponentTeamId = teamByNormalizedName.get(normalizeName(row.opponentRaw)) || null
+        const opp = findTeamMatch(row.opponentRaw, allTeams || [])
+        const oppId = opp && opp.id !== team.id ? opp.id : null
+
+        if (alreadyCovered(team, row, oppId)) {
+          skippedDuplicates += 1
+          continue
+        }
 
         const { error, data } = await supabase
           .from('pending_score_reviews')
           .insert({
             team_id: team.id,
             opponent_raw: row.opponentRaw,
-            matched_opponent_team_id: matchedOpponentTeamId,
+            matched_opponent_team_id: oppId,
             game_date: row.gameDate,
             is_home: row.isHome,
             entry_type: row.type,
@@ -151,8 +248,18 @@ export default async function handler(req, res) {
           })
           .select()
 
-        // Duplicate (already seen on a previous day's run) is expected and fine.
-        if (!error && data) totalInserted += 1
+        // Same-run duplicates (Duncan's page, then Newcastle's) are caught because
+        // each new entry is remembered here immediately.
+        if (!error && data) {
+          totalInserted += 1
+          knownReviews.push({
+            team_id: team.id,
+            matched_opponent_team_id: oppId,
+            opponent_raw: row.opponentRaw,
+            game_date: row.gameDate,
+            entry_type: row.type,
+          })
+        }
       }
     } catch (err) {
       errors.push({ team: team.name, error: String(err) })
@@ -165,6 +272,7 @@ export default async function handler(req, res) {
     teamsChecked: (teams || []).length,
     gamesFound: totalFound,
     newReviews: totalInserted,
+    skippedDuplicates,
     errors,
   })
 }
