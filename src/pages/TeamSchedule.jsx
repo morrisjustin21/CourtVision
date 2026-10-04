@@ -2,6 +2,17 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { useCurrentSeason } from '../useCurrentSeason'
 
+// Same rule the Games screen uses to label a season (July onward starts a new one).
+function guessSeason(dateStr) {
+  if (!dateStr) return ''
+  const [year, month] = dateStr.split('-').map(Number)
+  if (month >= 7) return `${year}-${String(year + 1).slice(2)}`
+  return `${year - 1}-${String(year).slice(2)}`
+}
+
+// A game with no season label is treated as belonging to the season its date falls in.
+const seasonOf = (g) => g.season || guessSeason(g.game_date)
+
 export default function TeamSchedule({ team }) {
   const [games, setGames] = useState([])
   const [loading, setLoading] = useState(true)
@@ -31,12 +42,12 @@ export default function TeamSchedule({ team }) {
   }, [seasonLoading, currentSeason, seasonFilter])
 
   const seasons = useMemo(
-    () => [...new Set(games.map((g) => g.season).filter(Boolean))].sort().reverse(),
+    () => [...new Set(games.map(seasonOf).filter(Boolean))].sort().reverse(),
     [games]
   )
 
   const filteredGames = useMemo(
-    () => (!seasonFilter || seasonFilter === 'all' ? games : games.filter((g) => g.season === seasonFilter)),
+    () => (!seasonFilter || seasonFilter === 'all' ? games : games.filter((g) => seasonOf(g) === seasonFilter)),
     [games, seasonFilter]
   )
 
