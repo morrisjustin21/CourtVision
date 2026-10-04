@@ -23,6 +23,14 @@ function normalizeMatchupPlan(raw) {
   return base.map((slot, i) => ({ ...slot, ...(raw[i] || {}) }))
 }
 
+// Same rule the Games screen uses to label a season (July onward starts a new one).
+function guessSeason(dateStr) {
+  if (!dateStr) return ''
+  const [year, month] = dateStr.split('-').map(Number)
+  if (month >= 7) return `${year}-${String(year + 1).slice(2)}`
+  return `${year - 1}-${String(year).slice(2)}`
+}
+
 export default function Teams() {
   const [teams, setTeams] = useState([])
   const [gameSeasonsByTeam, setGameSeasonsByTeam] = useState({}) // teamId -> Set of seasons
@@ -36,16 +44,18 @@ export default function Teams() {
     setLoading(true)
     const [{ data: teamsData }, { data: gamesData }] = await Promise.all([
       supabase.from('teams').select('*').order('name'),
-      supabase.from('games').select('home_team_id, away_team_id, season'),
+      supabase.from('games').select('home_team_id, away_team_id, season, game_date'),
     ])
     setTeams(teamsData || [])
 
     const byTeam = {}
     ;(gamesData || []).forEach((g) => {
-      if (!g.season) return
+      // A game with no season label still counts — work it out from its date.
+      const season = g.season || guessSeason(g.game_date)
+      if (!season) return
       for (const teamId of [g.home_team_id, g.away_team_id]) {
         if (!byTeam[teamId]) byTeam[teamId] = new Set()
-        byTeam[teamId].add(g.season)
+        byTeam[teamId].add(season)
       }
     })
     setGameSeasonsByTeam(byTeam)
@@ -64,14 +74,17 @@ export default function Teams() {
 
   const seasons = [...new Set(Object.values(gameSeasonsByTeam).flatMap((s) => [...s]))].sort().reverse()
 
-  // A team shows up when it's your own team, it has no games logged at all yet
-  // (so newly-added teams don't just vanish), or it has a game in the selected
-  // season. Otherwise it's an old opponent from a season you're not looking at.
+  // A team shows up when it's your own team, it's been placed in a district
+  // (so district opponents don't vanish before their schedule is added), it has
+  // no games logged at all yet (so newly-added teams don't just vanish), or it
+  // has a game in the selected season. Otherwise it's an old opponent from a
+  // season you're not looking at.
   const visibleTeams =
     !seasonFilter || seasonFilter === 'all'
       ? teams
       : teams.filter((t) => {
           if (t.is_my_team) return true
+          if (t.district && t.district.trim()) return true
           const teamSeasons = gameSeasonsByTeam[t.id]
           if (!teamSeasons) return true
           return teamSeasons.has(seasonFilter)
