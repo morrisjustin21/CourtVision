@@ -170,6 +170,14 @@ export default function Automation() {
 
 
 // OSSAA lists teams in ALL CAPS; start from a normal-looking name the coach can edit.
+// Same rule the Games screen uses to label a game's season (July onward starts a new one).
+function guessSeason(dateStr) {
+  if (!dateStr) return null
+  const [year, month] = dateStr.split('-').map(Number)
+  if (month >= 7) return `${year}-${String(year + 1).slice(2)}`
+  return `${year - 1}-${String(year).slice(2)}`
+}
+
 function titleCase(s) {
   return (s || '').toLowerCase().replace(/\b([a-z])/g, (c) => c.toUpperCase())
 }
@@ -235,7 +243,7 @@ function ReviewCard({ review, duplicates = [], allTeams, onResolved, onTeamCreat
     // Look for an existing game already logged for this matchup and date.
     const { data: existing } = await supabase
       .from('games')
-      .select('id')
+      .select('id, season')
       .eq('game_date', review.game_date)
       .or(
         `and(home_team_id.eq.${homeTeamId},away_team_id.eq.${awayTeamId}),and(home_team_id.eq.${awayTeamId},away_team_id.eq.${homeTeamId})`
@@ -244,16 +252,23 @@ function ReviewCard({ review, duplicates = [], allTeams, onResolved, onTeamCreat
 
     let gameId = existing?.id
     if (gameId) {
+      // Update the score if this is a score entry, and fill in the season if the
+      // game doesn't have one (never overwrite a season that's already set).
+      const updates = {}
       if (isScore) {
-        await supabase.from('games').update({ home_score: homeScore, away_score: awayScore }).eq('id', gameId)
+        updates.home_score = homeScore
+        updates.away_score = awayScore
       }
-      // If it's a schedule entry and the game already exists, there's nothing more to do —
-      // it's already on the schedule.
+      if (!existing.season) updates.season = guessSeason(review.game_date)
+      if (Object.keys(updates).length > 0) {
+        await supabase.from('games').update(updates).eq('id', gameId)
+      }
     } else {
       const { data: created } = await supabase
         .from('games')
         .insert({
           game_date: review.game_date,
+          season: guessSeason(review.game_date),
           home_team_id: homeTeamId,
           away_team_id: awayTeamId,
           home_score: homeScore,
