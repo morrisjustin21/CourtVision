@@ -1,5 +1,21 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
+import { nameWords, findTeamMatch } from '../teamMatching'
+
+// The same game can be reported by both teams' schedule pages (or twice with the
+// opponent spelled differently, like "Elgin" and "Elgin Owls"). Collapse those into
+// one entry so you only review each game once.
+function groupReviews(reviews, allTeams) {
+  const groups = new Map()
+  reviews.forEach((r) => {
+    const oppId = r.matched_opponent_team_id || findTeamMatch(r.opponent_raw, allTeams)?.id || null
+    const pair = [r.team_id, oppId || `raw:${nameWords(r.opponent_raw).join('')}`].sort().join('~')
+    const key = `${r.game_date}|${pair}`
+    if (!groups.has(key)) groups.set(key, [])
+    groups.get(key).push(r)
+  })
+  return [...groups.values()].map((list) => ({ review: list[0], duplicates: list.slice(1) }))
+}
 
 export default function Automation() {
   const [settings, setSettings] = useState(null)
@@ -31,6 +47,10 @@ export default function Automation() {
     loadAll()
   }, [])
 
+  function handleTeamCreated(team) {
+    setAllTeams((prev) => [...prev, team].sort((a, b) => a.name.localeCompare(b.name)))
+  }
+
   async function toggleEnabled() {
     setSavingToggle(true)
     const next = !settings.auto_score_check_enabled
@@ -41,8 +61,8 @@ export default function Automation() {
 
   if (loading) return <p className="text-chalkdim">Loading…</p>
 
-  const scoreReviews = reviews.filter((r) => r.entry_type === 'score')
-  const scheduleReviews = reviews.filter((r) => r.entry_type === 'schedule')
+  const scoreGroups = groupReviews(reviews.filter((r) => r.entry_type === 'score'), allTeams)
+  const scheduleGroups = groupReviews(reviews.filter((r) => r.entry_type === 'schedule'), allTeams)
 
   return (
     <div>
@@ -102,31 +122,45 @@ export default function Automation() {
       )}
 
       <h3 className="font-display text-xl font-semibold text-chalkdim uppercase tracking-wide text-sm mb-3">
-        Pending schedule updates ({scheduleReviews.length})
+        Pending schedule updates ({scheduleGroups.length})
       </h3>
-      {scheduleReviews.length === 0 ? (
+      {scheduleGroups.length === 0 ? (
         <div className="border border-dashed border-line rounded-lg p-6 text-center text-chalkdim text-sm mb-8">
           Nothing waiting for review right now.
         </div>
       ) : (
         <div className="space-y-3 mb-8">
-          {scheduleReviews.map((review) => (
-            <ReviewCard key={review.id} review={review} allTeams={allTeams} onResolved={loadAll} />
+          {scheduleGroups.map(({ review, duplicates }) => (
+            <ReviewCard
+              key={review.id}
+              review={review}
+              duplicates={duplicates}
+              allTeams={allTeams}
+              onResolved={loadAll}
+              onTeamCreated={handleTeamCreated}
+            />
           ))}
         </div>
       )}
 
       <h3 className="font-display text-xl font-semibold text-chalkdim uppercase tracking-wide text-sm mb-3">
-        Pending score reviews ({scoreReviews.length})
+        Pending score reviews ({scoreGroups.length})
       </h3>
-      {scoreReviews.length === 0 ? (
+      {scoreGroups.length === 0 ? (
         <div className="border border-dashed border-line rounded-lg p-6 text-center text-chalkdim text-sm">
           Nothing waiting for review right now.
         </div>
       ) : (
         <div className="space-y-3">
-          {scoreReviews.map((review) => (
-            <ReviewCard key={review.id} review={review} allTeams={allTeams} onResolved={loadAll} />
+          {scoreGroups.map(({ review, duplicates }) => (
+            <ReviewCard
+              key={review.id}
+              review={review}
+              duplicates={duplicates}
+              allTeams={allTeams}
+              onResolved={loadAll}
+              onTeamCreated={handleTeamCreated}
+            />
           ))}
         </div>
       )}
@@ -134,20 +168,58 @@ export default function Automation() {
   )
 }
 
-function ReviewCard({ review, allTeams, onResolved }) {
-  const [opponentTeamId, setOpponentTeamId] = useState(review.matched_opponent_team_id || '')
+
+// OSSAA lists teams in ALL CAPS; start from a normal-looking name the coach can edit.
+function titleCase(s) {
+  return (s || '').toLowerCase().replace(/\b([a-z])/g, (c) => c.toUpperCase())
+}
+
+function ReviewCard({ review, duplicates = [], allTeams, onResolved, onTeamCreated }) {
+  const [opponentTeamId, setOpponentTeamId] = useState(
+    review.matched_opponent_team_id || findTeamMatch(review.opponent_raw, allTeams)?.id || ''
+  )
   const [creatingTeam, setCreatingTeam] = useState(false)
-  const [newTeamName, setNewTeamName] = useState(review.opponent_raw)
+  const [newTeamName, setNewTeamName] = useState(titleCase(review.opponent_raw))
+  const [teamError, setTeamError] = useState('')
+  const [skipped, setSkipped] = useState(false)
   const [busy, setBusy] = useState(false)
 
+  const opponentTeam = allTeams.find((t) => t.id === opponentTeamId)
+
+  // Both teams' pages should report the same score. Flag it if they don't.
+  const scoreDisagreement =
+    review.entry_type === 'score' &&
+    duplicates.some((d) => {
+      const sameSide = d.team_id === review.team_id
+      const theirs = sameSide ? d.team_score : d.opponent_score
+      const theirOpp = sameSide ? d.opponent_score : d.team_score
+      return theirs !== review.team_score || theirOpp !== review.opponent_score
+    })
+
   async function createOpponentTeam() {
-    setBusy(true)
-    const { data } = await supabase.from('teams').insert({ name: newTeamName }).select().single()
-    setBusy(false)
-    if (data) {
-      setOpponentTeamId(data.id)
+    const name = newTeamName.trim()
+    if (!name) return
+    setTeamError('')
+
+    // If a team with the same name is already in CourtVision, link to it
+    // instead of creating a duplicate.
+    const existing = findTeamMatch(name, allTeams)
+    if (existing) {
+      setOpponentTeamId(existing.id)
       setCreatingTeam(false)
+      return
     }
+
+    setBusy(true)
+    const { data, error } = await supabase.from('teams').insert({ name }).select().single()
+    setBusy(false)
+    if (error || !data) {
+      setTeamError("Couldn't add that team. Please try again.")
+      return
+    }
+    onTeamCreated(data)
+    setOpponentTeamId(data.id)
+    setCreatingTeam(false)
   }
 
   async function approve() {
@@ -197,15 +269,45 @@ function ReviewCard({ review, allTeams, onResolved }) {
       .update({ status: 'approved', matched_opponent_team_id: opponentTeamId, resolved_game_id: gameId })
       .eq('id', review.id)
 
+    // The same game reported by the other team's page (or spelled differently) is
+    // handled by this one approval.
+    for (const d of duplicates) {
+      await supabase
+        .from('pending_score_reviews')
+        .update({
+          status: 'approved',
+          matched_opponent_team_id: d.team_id === review.team_id ? opponentTeamId : review.team_id,
+          resolved_game_id: gameId,
+        })
+        .eq('id', d.id)
+    }
+
     setBusy(false)
     onResolved()
   }
 
   async function reject() {
     setBusy(true)
-    await supabase.from('pending_score_reviews').update({ status: 'rejected' }).eq('id', review.id)
+    await supabase
+      .from('pending_score_reviews')
+      .update({ status: 'rejected' })
+      .in('id', [review.id, ...duplicates.map((d) => d.id)])
     setBusy(false)
     onResolved()
+  }
+
+  // Skipped cards collapse to one line and come back the next time the page loads.
+  if (skipped) {
+    return (
+      <div className="bg-panel border border-line rounded-lg px-4 py-2.5 flex items-center justify-between gap-3 text-xs text-chalkdim">
+        <span>
+          Skipped: {review.team?.name} {review.is_home ? 'vs' : '@'} {review.opponent_raw} · {review.game_date}
+        </span>
+        <button onClick={() => setSkipped(false)} className="hover:text-chalk shrink-0">
+          Undo
+        </button>
+      </div>
+    )
   }
 
   return (
@@ -214,6 +316,21 @@ function ReviewCard({ review, allTeams, onResolved }) {
         {review.team?.name} {review.is_home ? 'vs' : '@'} {review.opponent_raw}
         <span className="text-chalkdim text-sm font-normal"> · {review.game_date}</span>
       </p>
+      {duplicates.length > 0 && (
+        <p className="text-xs text-chalkdim mb-2">
+          Also listed on {[...new Set(duplicates.map((d) => d.team?.name).filter(Boolean))].join(', ') || 'another schedule'}
+          's page — approving or dismissing this handles all of them.
+        </p>
+      )}
+      {scoreDisagreement && (
+        <p className="text-xs text-alert mb-2">
+          The schedule pages don't agree on this score (
+          {[review, ...duplicates]
+            .map((r) => `${r.team?.name}: ${r.team_score}-${r.opponent_score}`)
+            .join(' · ')}
+          ). Double-check before approving.
+        </p>
+      )}
       {review.entry_type === 'score' ? (
         <p className="text-sm mb-3">
           <span className="text-red font-semibold stat-figure">
@@ -227,8 +344,8 @@ function ReviewCard({ review, allTeams, onResolved }) {
 
       {!opponentTeamId && !creatingTeam && (
         <div className="mb-3">
-          <p className="text-xs text-chalkdim mb-1.5">
-            No team in CourtVision matches "{review.opponent_raw}" — pick one or add it as new:
+          <p className="text-xs text-chalkdim mb-2">
+            No team in CourtVision matches "{review.opponent_raw}". Pick an existing team, or add it:
           </p>
           <div className="flex flex-wrap gap-2 items-center">
             <select
@@ -241,49 +358,75 @@ function ReviewCard({ review, allTeams, onResolved }) {
                 <option key={t.id} value={t.id}>{t.name}</option>
               ))}
             </select>
+            <span className="text-xs text-chalkdim">or</span>
             <button
               onClick={() => setCreatingTeam(true)}
-              className="text-xs text-chalkdim hover:text-red"
+              className="text-xs font-semibold bg-panel2 border border-red/60 text-chalk rounded-md px-3 py-1.5 hover:border-red"
             >
-              or + add "{review.opponent_raw}" as a new team
+              + Add "{titleCase(review.opponent_raw)}" as a new team
             </button>
           </div>
         </div>
       )}
 
       {creatingTeam && (
-        <div className="mb-3 flex items-center gap-2">
-          <input
-            value={newTeamName}
-            onChange={(e) => setNewTeamName(e.target.value)}
-            className="bg-panel2 border border-line rounded-md px-2 py-1.5 text-sm focus:border-red outline-none"
-          />
-          <button
-            onClick={createOpponentTeam}
-            disabled={busy}
-            className="text-xs bg-red text-white font-semibold rounded-md px-3 py-1.5 hover:bg-red/90 disabled:opacity-60"
-          >
-            {busy ? 'Adding…' : 'Add team'}
-          </button>
-          <button onClick={() => setCreatingTeam(false)} className="text-xs text-chalkdim hover:text-chalk">
-            Cancel
-          </button>
+        <div className="mb-3">
+          <p className="text-xs text-chalkdim mb-1.5">
+            New team name. Just the school name is best ("Elgin", not "Elgin Owls"), though either will match later:
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              value={newTeamName}
+              onChange={(e) => setNewTeamName(e.target.value)}
+              className="bg-panel2 border border-line rounded-md px-2 py-1.5 text-sm focus:border-red outline-none"
+            />
+            <button
+              onClick={createOpponentTeam}
+              disabled={busy || !newTeamName.trim()}
+              className="text-xs bg-red text-white font-semibold rounded-md px-3 py-1.5 hover:bg-red/90 disabled:opacity-60"
+            >
+              {busy ? 'Adding…' : 'Add team'}
+            </button>
+            <button
+              onClick={() => {
+                setCreatingTeam(false)
+                setTeamError('')
+              }}
+              className="text-xs text-chalkdim hover:text-chalk"
+            >
+              Cancel
+            </button>
+          </div>
+          {teamError && <p className="text-alert text-xs mt-1.5">{teamError}</p>}
         </div>
       )}
 
       {opponentTeamId && (
         <p className="text-xs text-chalkdim mb-3">
-          Opponent: {allTeams.find((t) => t.id === opponentTeamId)?.name}
+          Opponent: <span className="text-chalk font-medium">{opponentTeam?.name || '…'}</span>{' '}
+          <button
+            onClick={() => setOpponentTeamId('')}
+            className="ml-1 underline hover:text-chalk"
+          >
+            Change
+          </button>
         </p>
       )}
 
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <button
           onClick={approve}
           disabled={busy || !opponentTeamId}
           className="text-xs bg-red text-white font-semibold rounded-md px-3 py-1.5 hover:bg-red/90 disabled:opacity-60"
         >
           {busy ? 'Saving…' : 'Approve'}
+        </button>
+        <button
+          onClick={() => setSkipped(true)}
+          disabled={busy}
+          className="text-xs bg-panel2 border border-line text-chalk rounded-md px-3 py-1.5 hover:border-red disabled:opacity-60"
+        >
+          Skip for now
         </button>
         <button
           onClick={reject}
@@ -293,6 +436,9 @@ function ReviewCard({ review, allTeams, onResolved }) {
           Dismiss
         </button>
       </div>
+      <p className="text-[11px] text-chalkdim mt-2">
+        Skip for now keeps it in the queue for later. Dismiss removes it for good.
+      </p>
     </div>
   )
 }
